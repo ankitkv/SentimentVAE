@@ -28,6 +28,18 @@ def read_words(line):
                 yield word
 
 
+def display_sentences(output, vocab):  # XXX unused
+    '''Display sentences from indices based on vocab.'''
+    for i, sent in enumerate(output):
+        print 'Sentence %d:' % i,
+        for word in sent:
+            if word == vocab.eos_index:
+                break
+            print vocab.vocab[word],
+        print
+    print
+
+
 def grouper(n, iterable, fillvalue=None):
     '''Group elements of iterable in groups of n. For example:
        >>> [e for e in grouper(3, [1,2,3,4,5,6,7])]
