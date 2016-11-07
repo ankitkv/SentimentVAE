@@ -26,7 +26,7 @@ class EncoderDecoderModel(object):
                                             name='rdata_dropped')
 
         lembs = self.word_embeddings(self.ldata)
-        rembs_dropped = self.word_embeddings(self.rdata_dropped)
+        rembs_dropped = self.word_embeddings(self.rdata_dropped, reuse=True)
         self.latent = self.encoder(rembs_dropped)
 
         output = self.decoder(lembs, self.latent)
@@ -43,12 +43,12 @@ class EncoderDecoderModel(object):
 
     def rnn_cell(self, num_layers, latent=None):
         '''Return a multi-layer RNN cell.'''
-        return rnncell.MultiRNNCell([rnncell.GRUCell(self.config.hidden_size, latent=latent)
-                                     for _ in xrange(num_layers)])
+        return tf.nn.rnn_cell.MultiRNNCell([rnncell.GRUCell(self.config.hidden_size, latent=latent)
+                                                for _ in xrange(num_layers)])
 
-    def word_embeddings(self, inputs):
+    def word_embeddings(self, inputs, reuse=None):
         '''Look up word embeddings for the input indices.'''
-        with tf.device('/cpu:0'):
+        with tf.device('/cpu:0'), tf.variable_scope("Embeddings", reuse=reuse):
             embedding = tf.get_variable('word_embedding', [len(self.vocab.vocab),
                                                            self.config.word_emb_size],
                                         initializer=tf.random_uniform_initializer(-1.0, 1.0))
@@ -57,7 +57,7 @@ class EncoderDecoderModel(object):
 
     def encoder(self, inputs):
         '''Encode sentence and return a latent representation.'''
-        with tf.variable_scope("Encoder", reuse=self.mle_reuse):
+        with tf.variable_scope("Encoder"):
             _, state = tf.nn.dynamic_rnn(self.rnn_cell(self.config.num_layers), inputs,
                                          dtype=tf.float32)
             latent = utils.highway(state)
@@ -65,31 +65,10 @@ class EncoderDecoderModel(object):
 
     def decoder(self, inputs, latent):
         '''Use the latent representation and word inputs to predict next words.'''
-        with tf.variable_scope("Decoder", reuse=self.reuse):
-            if self.mle_mode:
-                outputs, _ = tf.nn.dynamic_rnn(self.rnn_cell(self.config.num_layers, latent,
-                                                             return_states=True), inputs,
-                                               dtype=tf.float32)
-            else:
-                outputs, _ = tf.nn.dynamic_rnn(self.rnn_cell(self.config.num_layers, latent,
-                                                             self.embedding, self.softmax_w,
-                                                             self.softmax_b, return_states=True),
-                                               inputs, dtype=tf.float32)
-            output = tf.slice(outputs, [0, 0, 0], [-1, -1, self.config.hidden_size])
-            if self.mle_mode:
-                generated = None
-                skip = 0
-            else:
-                words = tf.squeeze(tf.cast(tf.slice(outputs, [0, 0, self.config.hidden_size],
-                                                    [-1, self.config.gen_sent_length - 1, 1]),
-                                           tf.int32), [-1])
-                generated = tf.stop_gradient(tf.concat(1, [words, tf.constant(self.vocab.eos_index,
-                                                                              shape=[self.config.batch_size, 1])]))
-                skip = 1
-            states = tf.slice(outputs, [0, 0, self.config.hidden_size + skip], [-1, -1, -1])
-            # for GRU, we skipped the last layer states because they're the outputs
-            states = tf.concat(2, [states, output])
-        return output, states, generated
+        with tf.variable_scope("Decoder"):
+            output, _ = tf.nn.dynamic_rnn(self.rnn_cell(self.config.num_layers, latent), inputs,
+                                          dtype=tf.float32)
+        return output
 
     def mle_loss(self, outputs, targets):
         '''Maximum likelihood estimation loss.'''

@@ -44,8 +44,7 @@ def run_epoch(epoch, session, model, batch_loader, config, vocab, saver, steps, 
     shortterm_steps = 0
 
     for step, batch in enumerate(batch_loader):
-        ret = call_mle_session(session, mle_model, batch, use_gan=update_d,
-                               get_latent=get_latent)
+        ret = call_mle_session(session, model, batch)
         nll, cost = ret[:2]
 
         nlls += nll
