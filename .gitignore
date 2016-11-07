@@ -1,3 +1,10 @@
+# Project-specific stuff
+data
+models
+
+# Editor stuff
+*.swp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
