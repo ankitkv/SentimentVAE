@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 import sys
 import time
@@ -27,9 +27,9 @@ def save_model(session, saver, perp, cur_iters):
     save_file = cfg.save_file
     if not cfg.save_overwrite:
         save_file = save_file + '.' + str(cur_iters)
-    print "Saving model (epoch perplexity: %.3f) ..." % perp
+    print("Saving model (epoch perplexity: %.3f) ..." % perp)
     save_file = saver.save(session, save_file)
-    print "Saved to", save_file
+    print("Saved to", save_file)
 
 
 def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_steps):
@@ -58,9 +58,9 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
         if step % cfg.print_every == 0:
             avg_nll = shortterm_nlls / shortterm_iters
             avg_cost = shortterm_costs / shortterm_steps
-            print("%d: %d  perplexity: %.3f  mle_loss: %.4f  cost: %.4f  speed: %.0f wps"
+            print(("%d: %d  perplexity: %.3f  mle_loss: %.4f  cost: %.4f  speed: %.0f wps"
                   % (epoch + 1, step, np.exp(avg_nll), avg_nll, avg_cost,
-                   shortterm_iters * cfg.batch_size / (time.time() - start_time)))
+                   shortterm_iters * cfg.batch_size / (time.time() - start_time))))
 
             shortterm_nlls = 0.0
             shortterm_costs = 0.0
@@ -102,13 +102,13 @@ def main(_):
         try:
             # try to restore a saved model file
             saver.restore(session, cfg.load_file)
-            print "Model restored from", cfg.load_file
+            print("Model restored from", cfg.load_file)
         except ValueError:
             if cfg.training:
                 tf.initialize_all_variables().run()
-                print "No loadable model file, new model initialized."
+                print("No loadable model file, new model initialized.")
             else:
-                print "You need to provide a valid model file for testing!"
+                print("You need to provide a valid model file for testing!")
                 sys.exit(1)
 
         if cfg.training:
@@ -116,28 +116,28 @@ def main(_):
             train_perps = []
             valid_perps = []
             model.assign_lr(session, cfg.learning_rate)
-            for i in xrange(cfg.max_epoch):
-                print "\nEpoch: %d  Learning rate: %.5f" % (i + 1, session.run(model.lr))
+            for i in range(cfg.max_epoch):
+                print("\nEpoch: %d  Learning rate: %.5f" % (i + 1, session.run(model.lr)))
                 perplexity, steps = run_epoch(i, session, model, reader.training(), vocab,
                                               saver, steps, cfg.max_steps)
-                print "Epoch: %d Train Perplexity: %.3f" % (i + 1, perplexity)
+                print("Epoch: %d Train Perplexity: %.3f" % (i + 1, perplexity))
                 train_perps.append(perplexity)
                 if cfg.validate_every > 0 and (i + 1) % cfg.validate_every == 0:
                     perplexity, _ = run_epoch(i, session, eval_model, reader.validation(),
                                               vocab, None, 0, -1)
-                    print "Epoch: %d Validation Perplexity: %.3f" % (i + 1, perplexity)
+                    print("Epoch: %d Validation Perplexity: %.3f" % (i + 1, perplexity))
                     valid_perps.append(perplexity)
                 else:
                     valid_perps.append(None)
-                print 'Train:', train_perps
-                print 'Valid:', valid_perps
+                print('Train:', train_perps)
+                print('Valid:', valid_perps)
                 if steps >= cfg.max_steps:
                     break
         else:
-            print '\nTesting'
+            print('\nTesting')
             perplexity, _ = run_epoch(0, session, test_model, reader.testing(), vocab,
                                       None, 0, cfg.max_steps)
-            print "Test Perplexity: %.3f" % perplexity
+            print("Test Perplexity: %.3f" % perplexity)
 
 
 if __name__ == "__main__":

@@ -42,7 +42,7 @@ class EncoderDecoderModel(object):
         '''Return a multi-layer RNN cell.'''
         return tf.nn.rnn_cell.MultiRNNCell([rnncell.GRUCell(cfg.hidden_size,
                                                             latent=latent)
-                                                for _ in xrange(num_layers)])
+                                                for _ in range(num_layers)])
 
     def word_embeddings(self, inputs, reuse=None):
         '''Look up word embeddings for the input indices.'''
@@ -104,7 +104,7 @@ class EncoderDecoderModel(object):
         grads = tf.gradients(cost, tvars)
         if cfg.max_grad_norm > 0:
             grads, _ = tf.clip_by_global_norm(grads, cfg.max_grad_norm)
-        return optimizer.apply_gradients(zip(grads, tvars))
+        return optimizer.apply_gradients(list(zip(grads, tvars)))
 
     def assign_lr(self, session, lr):
         '''Update the learning rate.'''

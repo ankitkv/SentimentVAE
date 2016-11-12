@@ -1,6 +1,6 @@
-from __future__ import division
 
-import cPickle as pickle
+
+import pickle as pickle
 import glob
 from os.path import join as pjoin
 import random
@@ -28,11 +28,11 @@ class Vocab(object):
     def load_by_parsing(self, save=False, verbose=True):
         '''Read the vocab from the dataset'''
         if verbose:
-            print 'Loading vocabulary by parsing...'
+            print('Loading vocabulary by parsing...')
         fnames = glob.glob(pjoin(cfg.data_path, '*.txt'))
         for fname in fnames:
             if verbose:
-                print fname
+                print(fname)
             with open(fname, 'r') as f:
                 for line in f:
                     for word in utils.read_words(line):
@@ -40,26 +40,26 @@ class Vocab(object):
                             self.vocab_lookup[word] = len(self.vocab)
                             self.vocab.append(word)
         if verbose:
-            print 'Vocabulary loaded, size:', len(self.vocab)
+            print('Vocabulary loaded, size:', len(self.vocab))
 
     def load_from_pickle(self, verbose=True):
         '''Read the vocab from a pickled file'''
         pkfile = cfg.vocab_file
         try:
             if verbose:
-                print 'Loading vocabulary from pickle...'
+                print('Loading vocabulary from pickle...')
             with open(pkfile, 'rb') as f:
                 self.vocab, self.vocab_lookup = pickle.load(f)
             if verbose:
-                print 'Vocabulary loaded, size:', len(self.vocab)
+                print('Vocabulary loaded, size:', len(self.vocab))
         except IOError:
             if verbose:
-                print 'Error loading from pickle, attempting parsing.'
+                print('Error loading from pickle, attempting parsing.')
             self.load_by_parsing(save=True, verbose=verbose)
             with open(pkfile, 'wb') as f:
                 pickle.dump([self.vocab, self.vocab_lookup], f, -1)
                 if verbose:
-                    print 'Saved pickle file.'
+                    print('Saved pickle file.')
 
     def lookup(self, words):
         return [self.sos_index] + [self.vocab_lookup.get(w, self.unk_index)
@@ -95,7 +95,7 @@ class Reader(object):
             mod = len(lines) % cfg.batch_size
             if mod != 0:
                 lines = [[self.vocab.sos_index, self.vocab.eos_index]
-                         for _ in xrange(cfg.batch_size - mod)] + lines
+                         for _ in range(cfg.batch_size - mod)] + lines
             yield lines
 
     def buffered_read(self, fnames):
@@ -135,7 +135,7 @@ class Reader(object):
         '''Pack python-list batches into numpy batches'''
         max_size = max(len(s) for s in batch)
         if len(batch) < cfg.batch_size:
-            batch.extend([[] for _ in xrange(cfg.batch_size - len(batch))])
+            batch.extend([[] for _ in range(cfg.batch_size - len(batch))])
         leftalign_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
         leftalign_drop_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
         sent_lengths = np.zeros([cfg.batch_size], dtype=np.int32)
@@ -155,11 +155,11 @@ def main(_):
     reader = Reader(vocab)
     for batch in reader.training():
         for line in batch[0]:
-            print line
+            print(line)
             for e in line:
-                print vocab.vocab[e],
-            print
-            print
+                print(vocab.vocab[e], end=' ')
+            print()
+            print()
 
 
 if __name__ == '__main__':
