@@ -30,7 +30,8 @@ class GRUCell(tf.nn.rnn_cell.RNNCell):
                 factors = [inputs, state]
                 if self.latent is not None:
                     factors.append(self.latent)
-                r, u = tf.split(1, 2, utils.linear(factors, 2 * self.num_units, True, 1.0))
+                r, u = tf.split(1, 2, utils.linear(factors, 2 * self.num_units, True,
+                                                   1.0))
                 r, u = tf.nn.sigmoid(r), tf.nn.sigmoid(u)
             with tf.variable_scope("Candidate"):
                 factors = [inputs, r * state]

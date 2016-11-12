@@ -92,7 +92,7 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None, initializer=None
     dtype = [a.dtype for a in args][0]
 
     if initializer is None:
-        initializer = tf.contrib.layers.xavier_initializer(uniform=False)
+        initializer = tf.contrib.layers.xavier_initializer()
     # Now the computation.
     with tf.variable_scope(scope or "Linear"):
         matrix = tf.get_variable("Matrix", [total_arg_size, output_size], dtype=dtype,
@@ -104,7 +104,8 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None, initializer=None
         if not bias:
             return res
         bias_term = tf.get_variable("Bias", [output_size], dtype=dtype,
-                                    initializer=tf.constant_initializer(bias_start, dtype=dtype))
+                                    initializer=tf.constant_initializer(bias_start,
+                                                                        dtype=dtype))
     return res + bias_term
 
 
@@ -121,8 +122,8 @@ def highway(input_, layer_size=1, bias=-2, f=tf.nn.tanh):  # XXX unused
     size = shape[1]
     for idx in xrange(layer_size):
         output = f(linear(input_, size, False, scope='Highway_Nonlin_%d' % idx))
-        transform_gate = tf.sigmoid(linear(input_, size, False, scope='Highway_Gate_%d' % idx)
-                                    + bias)
+        transform_gate = tf.sigmoid(linear(input_, size, False,
+                                           scope='Highway_Gate_%d' % idx) + bias)
         carry_gate = 1.0 - transform_gate
         output = transform_gate * output + carry_gate * input_
         input_ = output
