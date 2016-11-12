@@ -29,8 +29,8 @@ class EncoderDecoderModel(object):
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
         embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
-        self.latent = self.encoder(embs_reversed[:, 1:, :])
-        output = self.decoder(embs_dropped, self.latent)
+        self.z = self.encoder(embs_reversed[:, 1:, :])
+        output = self.decoder(embs_dropped, self.z)
 
         # shift left the input to get the targets
         targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
@@ -43,10 +43,9 @@ class EncoderDecoderModel(object):
         else:
             self.train_op = tf.no_op()
 
-    def rnn_cell(self, num_layers, latent=None):
+    def rnn_cell(self, num_layers, z=None):
         '''Return a multi-layer RNN cell.'''
-        return tf.nn.rnn_cell.MultiRNNCell([rnncell.GRUCell(cfg.hidden_size,
-                                                            latent=latent)
+        return tf.nn.rnn_cell.MultiRNNCell([rnncell.GRUCell(cfg.hidden_size, latent=z)
                                             for _ in range(num_layers)])
 
     def word_embeddings(self, inputs, reuse=None):
@@ -65,16 +64,16 @@ class EncoderDecoderModel(object):
             _, state = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
                                          sequence_length=self.lengths-1, swap_memory=True,
                                          dtype=tf.float32)
-            latent = utils.highway(state)
-            latent = utils.linear(latent, cfg.latent_size, True, scope='encoder_latent')
-        return latent
+            z = utils.highway(state)
+            z = utils.linear(z, cfg.latent_size, True, scope='encoder_latent')
+        return z
 
-    def decoder(self, inputs, latent):
+    def decoder(self, inputs, z):
         '''Use the latent representation and word inputs to predict next words.'''
         with tf.variable_scope("Decoder"):
-            latent = utils.highway(latent)
-            latent = utils.linear(latent, cfg.latent_size, True, scope='decoder_latent')
-            output, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers, latent), inputs,
+            z = utils.highway(z)
+            z = utils.linear(z, cfg.latent_size, True, scope='decoder_latent')
+            output, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers, z), inputs,
                                           sequence_length=self.lengths-1,
                                           swap_memory=True, dtype=tf.float32)
         return output
