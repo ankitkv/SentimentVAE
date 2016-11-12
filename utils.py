@@ -2,12 +2,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+
 import itertools
 import re
+import sys
 
 import nltk
 import numpy as np
 import tensorflow as tf
+
+# workaround for Python 2
+if sys.version[0] == '2':
+    itertools.zip_longest = itertools.izip_longest
 
 
 fix_re = re.compile(r'''[^a-z0-9"'?.,]+''')
