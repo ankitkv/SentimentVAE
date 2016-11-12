@@ -21,7 +21,7 @@ class EncoderDecoderModel(object):
         self.data = tf.placeholder(tf.int32, [cfg.batch_size, None], name='data')
         # sentences with word dropout
         self.data_dropped = tf.placeholder(tf.int32, [cfg.batch_size, None],
-                                            name='data_dropped')
+                                           name='data_dropped')
         # sentence lengths
         self.lengths = tf.placeholder(tf.int32, [cfg.batch_size], name='lengths')
 
@@ -33,7 +33,7 @@ class EncoderDecoderModel(object):
 
         # shift left the input to get the targets
         targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
-                                                            tf.int32)])
+                                                           tf.int32)])
         mle_loss = self.mle_loss(output, targets)
         self.nll = tf.reduce_sum(mle_loss) / cfg.batch_size
         self.cost = self.nll
@@ -46,7 +46,7 @@ class EncoderDecoderModel(object):
         '''Return a multi-layer RNN cell.'''
         return tf.nn.rnn_cell.MultiRNNCell([rnncell.GRUCell(cfg.hidden_size,
                                                             latent=latent)
-                                                for _ in range(num_layers)])
+                                            for _ in range(num_layers)])
 
     def word_embeddings(self, inputs, reuse=None):
         '''Look up word embeddings for the input indices.'''

@@ -8,7 +8,6 @@ import re
 import sys
 
 import nltk
-import numpy as np
 import tensorflow as tf
 
 # workaround for Python 2

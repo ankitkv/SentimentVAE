@@ -64,7 +64,7 @@ class Vocab(object):
 
     def lookup(self, words):
         return [self.sos_index] + [self.vocab_lookup.get(w, self.unk_index)
-                                       for w in words] + [self.eos_index]
+                                   for w in words] + [self.eos_index]
 
 
 class Reader(object):

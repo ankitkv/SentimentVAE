@@ -11,7 +11,6 @@ import tensorflow as tf
 from config import cfg
 from encdec import EncoderDecoderModel
 from reader import Reader, Vocab
-import utils
 
 
 def call_mle_session(session, model, batch):
