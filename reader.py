@@ -5,7 +5,6 @@ import glob
 from os.path import join as pjoin
 import random
 
-import nltk
 import numpy as np
 import tensorflow as tf
 
