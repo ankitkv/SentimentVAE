@@ -29,9 +29,9 @@ class EncoderDecoderModel(object):
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
         embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
-        self.z_mean, self.z_logvar = self.encoder(embs_reversed[:, 1:, :])
+        z_mean, z_logvar = self.encoder(embs_reversed[:, 1:, :])
         eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
-        self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(self.z_logvar)), eps)
+        self.z = z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
         output = self.decoder(embs_dropped, self.z)
 
         # shift left the input to get the targets
@@ -39,7 +39,11 @@ class EncoderDecoderModel(object):
                                                            tf.int32)])
         mle_loss = self.mle_loss(output, targets)
         self.nll = tf.reduce_sum(mle_loss) / cfg.batch_size
-        self.cost = self.nll
+        self.kld = self.kld_loss(z_mean, z_logvar)
+        self.kld_weight = tf.get_variable("kld_weight", shape=[],
+                                          initializer=tf.zeros_initializer,
+                                          trainable=False)
+        self.cost = self.nll + (self.kld_weight * self.kld)
         if training:
             self.train_op = self.train(self.cost)
         else:
@@ -104,6 +108,10 @@ class EncoderDecoderModel(object):
                                                           [tf.reshape(mask, [-1])])
         return tf.reshape(loss, [cfg.batch_size, -1])
 
+    def kld_loss(self, z_mean, z_logvar):
+        '''KL divergence loss.'''
+        return 0.0  # TODO
+
     def train(self, cost):
         '''Generic training helper'''
         self.lr = tf.get_variable("lr", shape=[], initializer=tf.zeros_initializer,
@@ -118,3 +126,7 @@ class EncoderDecoderModel(object):
     def assign_lr(self, session, lr):
         '''Update the learning rate.'''
         session.run(tf.assign(self.lr, lr))
+
+    def assign_kld_weight(self, session, kld_weight):
+        '''Update the KL divergence loss weight.'''
+        session.run(tf.assign(self.kld_weight, kld_weight))
