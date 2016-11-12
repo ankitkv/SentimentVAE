@@ -11,7 +11,7 @@ import utils
 
 class EncoderDecoderModel(object):
 
-    '''The encoder-decoder model.'''
+    '''The variational encoder-decoder model.'''
 
     def __init__(self, vocab, training):
         self.vocab = vocab
