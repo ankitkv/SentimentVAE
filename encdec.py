@@ -23,7 +23,7 @@ class EncoderDecoderModel(object):
 
         embs = self.word_embeddings(self.data)
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
-        self.latent = self.encoder(embs)
+        self.latent = self.encoder(embs[:, 1:, :])
 
         output = self.decoder(embs_dropped, self.latent)
 
@@ -58,7 +58,7 @@ class EncoderDecoderModel(object):
         '''Encode sentence and return a latent representation.'''
         with tf.variable_scope("Encoder"):
             _, state = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
-                                         sequence_length=self.lengths, swap_memory=True,
+                                         sequence_length=self.lengths-1, swap_memory=True,
                                          dtype=tf.float32)
             latent = utils.highway(state)
             latent = utils.linear(latent, cfg.latent_size, True, scope='encoder_latent')
