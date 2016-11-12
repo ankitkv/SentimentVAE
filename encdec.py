@@ -29,7 +29,9 @@ class EncoderDecoderModel(object):
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
         embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
-        self.z = self.encoder(embs_reversed[:, 1:, :])
+        self.z_mean, self.z_logvar = self.encoder(embs_reversed[:, 1:, :])
+        eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
+        self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(self.z_logvar)), eps)
         output = self.decoder(embs_dropped, self.z)
 
         # shift left the input to get the targets
@@ -65,8 +67,9 @@ class EncoderDecoderModel(object):
                                          sequence_length=self.lengths-1, swap_memory=True,
                                          dtype=tf.float32)
             z = utils.highway(state)
-            z = utils.linear(z, cfg.latent_size, True, scope='encoder_latent')
-        return z
+            z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
+            z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')
+        return z_mean, z_logvar
 
     def decoder(self, inputs, z):
         '''Use the latent representation and word inputs to predict next words.'''
