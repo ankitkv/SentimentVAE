@@ -122,8 +122,8 @@ def main(_):
 
         if cfg.training:
             steps = 0
-            train_perps = []
-            valid_perps = []
+            train_losses = []
+            valid_losses = []
             model.assign_lr(session, cfg.learning_rate)
             for i in range(cfg.max_epoch):
                 print("\nEpoch: %d  Learning rate: %.5f" % (i + 1, session.run(model.lr)))
@@ -131,18 +131,18 @@ def main(_):
                                                    vocab, saver, steps, cfg.max_steps)
                 print("Epoch: %d Train Perplexity: %.3f, KL Divergence: %.3f"
                       % (i + 1, perplexity, kld))
-                train_perps.append(perplexity)
+                train_losses.append((perplexity, kld))
                 if cfg.validate_every > 0 and (i + 1) % cfg.validate_every == 0:
                     perplexity, kld, _ = run_epoch(i, session, eval_model,
                                                    reader.validation(), vocab, None, 0,
                                                    -1)
                     print("Epoch: %d Validation Perplexity: %.3f, KL Divergence: %.3f"
                           % (i + 1, perplexity, kld))
-                    valid_perps.append(perplexity)
+                    valid_losses.append((perplexity, kld))
                 else:
-                    valid_perps.append(None)
-                print('Train:', train_perps)
-                print('Valid:', valid_perps)
+                    valid_losses.append(None)
+                print('Train:', train_losses)
+                print('Valid:', valid_losses)
                 if steps >= cfg.max_steps:
                     break
         else:
