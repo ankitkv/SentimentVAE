@@ -16,12 +16,12 @@ flags.DEFINE_string ("load_file",  "",                  "File to load model "
 flags.DEFINE_string ("vocab_file", "data/vocab.pk",     "Vocab pickle file")
 
 flags.DEFINE_integer("batch_size",      32,      "Batch size")
-flags.DEFINE_integer("word_emb_size",   224,     "Number of learnable dimensions in "
+flags.DEFINE_integer("word_emb_size",   352,     "Number of learnable dimensions in "
                                                  "word embeddings")
 flags.DEFINE_integer("num_layers",      1,       "Number of RNN layers")
-flags.DEFINE_integer("hidden_size",     192,     "RNN hidden state size")
-flags.DEFINE_integer("latent_size",     192,     "Latent representation size")
-flags.DEFINE_float  ("word_dropout",    0.75,    "Word dropout probability for decoder "
+flags.DEFINE_integer("hidden_size",     384,     "RNN hidden state size")
+flags.DEFINE_integer("latent_size",     16,      "Latent representation size")
+flags.DEFINE_float  ("word_dropout",    0.66,    "Word dropout probability for decoder "
                                                  "input")
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")

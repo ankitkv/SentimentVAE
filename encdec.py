@@ -27,8 +27,9 @@ class EncoderDecoderModel(object):
 
         embs = self.word_embeddings(self.data)
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
-        self.latent = self.encoder(embs[:, 1:, :])
+        embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
+        self.latent = self.encoder(embs_reversed[:, 1:, :])
         output = self.decoder(embs_dropped, self.latent)
 
         # shift left the input to get the targets
