@@ -71,6 +71,8 @@ class EncoderDecoderModel(object):
     def decoder(self, inputs, latent):
         '''Use the latent representation and word inputs to predict next words.'''
         with tf.variable_scope("Decoder"):
+            latent = utils.highway(latent)
+            latent = utils.linear(latent, cfg.latent_size, True, scope='decoder_latent')
             output, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers, latent), inputs,
                                           sequence_length=self.lengths-1,
                                           swap_memory=True, dtype=tf.float32)
