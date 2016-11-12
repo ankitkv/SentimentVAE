@@ -37,9 +37,8 @@ class EncoderDecoderModel(object):
         # shift left the input to get the targets
         targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
                                                            tf.int32)])
-        mle_loss = self.mle_loss(output, targets)
-        self.nll = tf.reduce_sum(mle_loss) / cfg.batch_size
-        self.kld = self.kld_loss(z_mean, z_logvar)
+        self.nll = tf.reduce_sum(self.mle_loss(output, targets)) / cfg.batch_size
+        self.kld = tf.reduce_sum(self.kld_loss(z_mean, z_logvar)) / cfg.batch_size
         self.kld_weight = tf.get_variable("kld_weight", shape=[],
                                           initializer=tf.zeros_initializer,
                                           trainable=False)
@@ -110,7 +109,9 @@ class EncoderDecoderModel(object):
 
     def kld_loss(self, z_mean, z_logvar):
         '''KL divergence loss.'''
-        return 0.0  # TODO
+        z_var = tf.exp(z_logvar)
+        z_mean_sq = tf.square(z_mean)
+        return 0.5 * tf.reduce_sum(z_var + z_mean_sq - 1 - z_logvar, 1)
 
     def train(self, cost):
         '''Generic training helper'''
