@@ -30,6 +30,8 @@ flags.DEFINE_integer("anneal_bias",     3500,    "The step to reach 0.5 for KL "
                                                  "divergence weight annealing")
 flags.DEFINE_integer("anneal_scale",    3500,    "Steps from 0.5 to flatten for KL "
                                                  "divergence weight annealing")
+flags.DEFINE_integer("anneal_every",    50,      "Anneal KL divergence weight every "
+                                                 "these many steps")
 flags.DEFINE_bool   ("training",        True,    "Training mode, turn off for testing")
 flags.DEFINE_string ("optimizer",       "adam",  "Optimizer to use (sgd, adam, adagrad, "
                                                  "adadelta)")
