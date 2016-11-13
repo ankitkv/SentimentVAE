@@ -26,6 +26,10 @@ flags.DEFINE_float  ("word_dropout",    0.66,    "Word dropout probability for d
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
 flags.DEFINE_float  ("max_grad_norm",   20.0,    "Gradient clipping")
+flags.DEFINE_integer("anneal_bias",     4000,    "The step to reach 0.5 for KL "
+                                                 "divergence weight annealing")
+flags.DEFINE_integer("anneal_scale",    4000,    "Steps from 0.5 to flatten for KL "
+                                                 "divergence weight annealing")
 flags.DEFINE_bool   ("training",        True,    "Training mode, turn off for testing")
 flags.DEFINE_string ("optimizer",       "adam",  "Optimizer to use (sgd, adam, adagrad, "
                                                  "adadelta)")
