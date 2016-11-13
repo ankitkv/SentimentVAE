@@ -40,6 +40,7 @@ class EncoderDecoderModel(object):
         output = self.decoder(embs_dropped, self.z)
 
         # shift left the input to get the targets
+
         with tf.variable_scope('left-shift'):
             targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
                                                                tf.int32)])
@@ -47,10 +48,11 @@ class EncoderDecoderModel(object):
             self.nll = tf.reduce_sum(self.mle_loss(output, targets)) / cfg.batch_size
         with tf.variable_scope('kld-cost'):
             self.kld = tf.reduce_sum(self.kld_loss(z_mean, z_logvar)) / cfg.batch_size
-            self.kld_weight = tf.sigmoid((7 / cfg.anneal_scale)
+            self.kld_weight = tf.sigmoid((7 / cfg.anneal_bias)
                                          * (self.global_step - cfg.anneal_bias))
         with tf.variable_scope('cost'):
             self.cost = self.nll + (self.kld_weight * self.kld)
+
         if training:
             self.train_op = self.train(self.cost)
         else:
