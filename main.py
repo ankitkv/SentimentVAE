@@ -102,12 +102,15 @@ def main(_):
     with tf.Graph().as_default(), tf.Session(config=config_proto) as session:
         with tf.variable_scope("Model") as scope:
             if cfg.training:
-                model = EncoderDecoderModel(vocab, True)
-                scope.reuse_variables()
-                eval_model = EncoderDecoderModel(vocab, False)
+                with tf.name_scope('training'):
+                    model = EncoderDecoderModel(vocab, True)
+                with tf.name_scope('evaluation'):
+                    scope.reuse_variables()
+                    eval_model = EncoderDecoderModel(vocab, False)
             else:
                 test_model = EncoderDecoderModel(vocab, False)
         saver = tf.train.Saver()
+        summary_writer = tf.train.SummaryWriter('./summary/', session.graph)
         try:
             # try to restore a saved model file
             saver.restore(session, cfg.load_file)

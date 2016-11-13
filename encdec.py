@@ -19,32 +19,38 @@ class EncoderDecoderModel(object):
         self.global_step = tf.get_variable('global_step', shape=[],
                                            initializer=tf.zeros_initializer,
                                            trainable=False)
-
-        # left-aligned data:  <sos> w1 w2 ... w_T <eos> <pad...>
-        self.data = tf.placeholder(tf.int32, [cfg.batch_size, None], name='data')
-        # sentences with word dropout
-        self.data_dropped = tf.placeholder(tf.int32, [cfg.batch_size, None],
-                                           name='data_dropped')
-        # sentence lengths
-        self.lengths = tf.placeholder(tf.int32, [cfg.batch_size], name='lengths')
+        with tf.name_scope('input'):
+            # left-aligned data:  <sos> w1 w2 ... w_T <eos> <pad...>
+            self.data = tf.placeholder(tf.int32, [cfg.batch_size, None], name='data')
+            # sentences with word dropout
+            self.data_dropped = tf.placeholder(tf.int32, [cfg.batch_size, None],
+                                               name='data_dropped')
+            # sentence lengths
+            self.lengths = tf.placeholder(tf.int32, [cfg.batch_size], name='lengths')
 
         embs = self.word_embeddings(self.data)
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
-        embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
+        with tf.variable_scope('reverse-embeddings'):
+            embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
         z_mean, z_logvar = self.encoder(embs_reversed[:, 1:, :])
-        eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
-        self.z = z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
+        with tf.variable_scope('reparameterize'):
+            eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
+            self.z = z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
         output = self.decoder(embs_dropped, self.z)
 
         # shift left the input to get the targets
-        targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
-                                                           tf.int32)])
-        self.nll = tf.reduce_sum(self.mle_loss(output, targets)) / cfg.batch_size
-        self.kld = tf.reduce_sum(self.kld_loss(z_mean, z_logvar)) / cfg.batch_size
-        self.kld_weight = tf.sigmoid((7 / cfg.anneal_scale)
-                                     * (self.global_step - cfg.anneal_bias))
-        self.cost = self.nll + (self.kld_weight * self.kld)
+        with tf.variable_scope('left-shift'):
+            targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
+                                                               tf.int32)])
+        with tf.variable_scope('mle-cost'):
+            self.nll = tf.reduce_sum(self.mle_loss(output, targets)) / cfg.batch_size
+        with tf.variable_scope('kld-cost'):
+            self.kld = tf.reduce_sum(self.kld_loss(z_mean, z_logvar)) / cfg.batch_size
+            self.kld_weight = tf.sigmoid((7 / cfg.anneal_scale)
+                                         * (self.global_step - cfg.anneal_bias))
+        with tf.variable_scope('cost'):
+            self.cost = self.nll + (self.kld_weight * self.kld)
         if training:
             self.train_op = self.train(self.cost)
         else:

@@ -1,6 +1,7 @@
 # Project-specific stuff
 data
 models
+summary
 
 # Editor stuff
 *.swp
