@@ -1,18 +1,8 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-
 import itertools
 import re
 import sys
 
-import nltk
 import tensorflow as tf
-
-# workaround for Python 2
-if sys.version[0] == '2':
-    itertools.zip_longest = itertools.izip_longest
 
 
 fix_re = re.compile(r'''[^a-z0-9"'?.,]+''')
@@ -27,14 +17,11 @@ def fix_word(word):
 
 
 def read_words(line):
-    # workaround to get the NLTK tokenization deal with <unk> nicely
-    for raw_word in nltk.word_tokenize(line.replace('<unk>', '-unk-')):
-        if raw_word == '-unk-':
-            yield '<unk>'
-        else:
-            word = fix_word(raw_word)
-            if word:
-                yield word
+    for word in line.split():
+        if word != '<unk>':
+            word = fix_word(word)
+        if word:
+            yield word
 
 
 def display_sentences(output, vocab):  # XXX unused

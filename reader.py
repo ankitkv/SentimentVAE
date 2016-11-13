@@ -1,10 +1,6 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import pickle as pickle
 import glob
 from os.path import join as pjoin
+import pickle
 import random
 
 import numpy as np
