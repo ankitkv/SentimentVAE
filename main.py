@@ -45,6 +45,8 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
     shortterm_costs = 0.0
     shortterm_iters = 0
     shortterm_steps = 0
+    if saver is None:
+        kld_weight = session.run(model.kld_weight)
 
     for step, batch in enumerate(batch_loader):
         cur_iters = steps + step
