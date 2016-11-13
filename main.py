@@ -45,15 +45,8 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
     shortterm_costs = 0.0
     shortterm_iters = 0
     shortterm_steps = 0
-    kld_weight = session.run(model.kld_weight)
 
     for step, batch in enumerate(batch_loader):
-        cur_iters = steps + step
-        if saver is not None and cur_iters % cfg.anneal_every == 0:
-            kld_step = (7 / cfg.anneal_scale) * (cur_iters - cfg.anneal_bias)
-            kld_weight = np.exp(-np.logaddexp(0, -kld_step))
-            model.assign_kld_weight(session, kld_weight)
-
         nll, kld, cost = call_mle_session(session, model, batch)
 
         nlls += nll
@@ -70,6 +63,7 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
             avg_nll = shortterm_nlls / shortterm_iters
             avg_kld = shortterm_klds / shortterm_steps
             avg_cost = shortterm_costs / shortterm_steps
+            kld_weight = session.run(model.kld_weight)
             print("%d: %d  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
                   "cost: %.4f  kld_weight: %.3f  speed: %.0f wps" % (epoch + 1, step,
                   np.exp(avg_nll), avg_nll, avg_kld, avg_cost, kld_weight,
@@ -82,6 +76,7 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
             shortterm_steps = 0
             start_time = time.time()
 
+        cur_iters = steps + step
         if saver is not None and cur_iters and cfg.save_every > 0 and \
                 cur_iters % cfg.save_every == 0:
             save_model(session, saver, np.exp(nlls / iters), np.exp(klds / (step + 1)),

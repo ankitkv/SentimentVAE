@@ -16,6 +16,9 @@ class EncoderDecoderModel(object):
     def __init__(self, vocab, training):
         self.vocab = vocab
         self.training = training
+        self.global_step = tf.get_variable('global_step', shape=[],
+                                           initializer=tf.zeros_initializer,
+                                           trainable=False)
 
         # left-aligned data:  <sos> w1 w2 ... w_T <eos> <pad...>
         self.data = tf.placeholder(tf.int32, [cfg.batch_size, None], name='data')
@@ -39,9 +42,8 @@ class EncoderDecoderModel(object):
                                                            tf.int32)])
         self.nll = tf.reduce_sum(self.mle_loss(output, targets)) / cfg.batch_size
         self.kld = tf.reduce_sum(self.kld_loss(z_mean, z_logvar)) / cfg.batch_size
-        self.kld_weight = tf.get_variable("kld_weight", shape=[],
-                                          initializer=tf.zeros_initializer,
-                                          trainable=False)
+        self.kld_weight = tf.sigmoid((7 / cfg.anneal_scale)
+                                     * (self.global_step - cfg.anneal_bias))
         self.cost = self.nll + (self.kld_weight * self.kld)
         if training:
             self.train_op = self.train(self.cost)
@@ -122,12 +124,9 @@ class EncoderDecoderModel(object):
         grads = tf.gradients(cost, tvars)
         if cfg.max_grad_norm > 0:
             grads, _ = tf.clip_by_global_norm(grads, cfg.max_grad_norm)
-        return optimizer.apply_gradients(list(zip(grads, tvars)))
+        return optimizer.apply_gradients(list(zip(grads, tvars)),
+                                         global_step=self.global_step)
 
     def assign_lr(self, session, lr):
         '''Update the learning rate.'''
         session.run(tf.assign(self.lr, lr))
-
-    def assign_kld_weight(self, session, kld_weight):
-        '''Update the KL divergence loss weight.'''
-        session.run(tf.assign(self.kld_weight, kld_weight))
