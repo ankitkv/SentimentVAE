@@ -51,7 +51,7 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
     for step, batch in enumerate(batch_loader):
         cur_iters = steps + step
         if saver is not None:
-            kld_step = (6 / cfg.anneal_scale) * (cur_iters - cfg.anneal_bias)
+            kld_step = (7 / cfg.anneal_scale) * (cur_iters - cfg.anneal_bias)
             kld_weight = np.exp(-np.logaddexp(0, -kld_step))
             model.assign_kld_weight(session, kld_weight)
 
