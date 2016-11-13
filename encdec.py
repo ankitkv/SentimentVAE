@@ -19,6 +19,9 @@ class EncoderDecoderModel(object):
         self.global_step = tf.get_variable('global_step', shape=[],
                                            initializer=tf.zeros_initializer,
                                            trainable=False)
+        self.summary_op = None
+        self.summaries = []
+
         with tf.name_scope('input'):
             # left-aligned data:  <sos> w1 w2 ... w_T <eos> <pad...>
             self.data = tf.placeholder(tf.int32, [cfg.batch_size, None], name='data')
@@ -30,33 +33,38 @@ class EncoderDecoderModel(object):
 
         embs = self.word_embeddings(self.data)
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
-        with tf.variable_scope('reverse-embeddings'):
+        with tf.name_scope('reverse-embeddings'):
             embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
         z_mean, z_logvar = self.encoder(embs_reversed[:, 1:, :])
-        with tf.variable_scope('reparameterize'):
+        with tf.name_scope('reparameterize'):
             eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
             self.z = z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
         output = self.decoder(embs_dropped, self.z)
 
         # shift left the input to get the targets
 
-        with tf.variable_scope('left-shift'):
+        with tf.name_scope('left-shift'):
             targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
                                                                tf.int32)])
-        with tf.variable_scope('mle-cost'):
+        with tf.name_scope('mle-cost'):
             self.nll = tf.reduce_sum(self.mle_loss(output, targets)) / cfg.batch_size
-        with tf.variable_scope('kld-cost'):
+            self.perplexity = tf.exp(self.nll/tf.cast(tf.shape(self.data)[1], tf.float32))
+            self.summaries.append(tf.scalar_summary('perplexity',
+                                                    tf.reduce_mean(self.perplexity)))
+        with tf.name_scope('kld-cost'):
             self.kld = tf.reduce_sum(self.kld_loss(z_mean, z_logvar)) / cfg.batch_size
             self.kld_weight = tf.sigmoid((7 / cfg.anneal_bias)
                                          * (self.global_step - cfg.anneal_bias))
-        with tf.variable_scope('cost'):
+            self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
+        with tf.name_scope('cost'):
             self.cost = self.nll + (self.kld_weight * self.kld)
 
         if training:
             self.train_op = self.train(self.cost)
         else:
             self.train_op = tf.no_op()
+
 
     def rnn_cell(self, num_layers, z=None):
         '''Return a multi-layer RNN cell.'''
@@ -115,13 +123,17 @@ class EncoderDecoderModel(object):
             loss = tf.nn.seq2seq.sequence_loss_by_example([logits],
                                                           [tf.reshape(targets, [-1])],
                                                           [tf.reshape(mask, [-1])])
-        return tf.reshape(loss, [cfg.batch_size, -1])
+        loss = tf.reshape(loss, [cfg.batch_size, -1])
+        self.summaries.append(tf.scalar_summary('cost_mle', tf.reduce_mean(loss)))
+        return loss
 
     def kld_loss(self, z_mean, z_logvar):
         '''KL divergence loss.'''
         z_var = tf.exp(z_logvar)
         z_mean_sq = tf.square(z_mean)
-        return 0.5 * tf.reduce_sum(z_var + z_mean_sq - 1 - z_logvar, 1)
+        kld_loss = 0.5 * tf.reduce_sum(z_var + z_mean_sq - 1 - z_logvar, 1)
+        self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(kld_loss)))
+        return kld_loss
 
     def train(self, cost):
         '''Generic training helper'''
@@ -138,3 +150,8 @@ class EncoderDecoderModel(object):
     def assign_lr(self, session, lr):
         '''Update the learning rate.'''
         session.run(tf.assign(self.lr, lr))
+
+    def summary(self):
+        if self.summary_op is None:
+            self.summary_op = tf.merge_summary(self.summaries)
+        return self.summary_op
