@@ -1,5 +1,4 @@
-import glob
-from os.path import join as pjoin
+from pathlib import Path
 import pickle
 import random
 
@@ -26,11 +25,11 @@ class Vocab(object):
         '''Read the vocab from the dataset'''
         if verbose:
             print('Loading vocabulary by parsing...')
-        fnames = glob.glob(pjoin(cfg.data_path, '*.txt'))
+        fnames = Path(cfg.data_path).glob('*.txt')
         for fname in fnames:
             if verbose:
                 print(fname)
-            with open(fname, 'r') as f:
+            with fname.open('r') as f:
                 for line in f:
                     for word in utils.read_words(line):
                         if word not in self.vocab_lookup:
@@ -72,7 +71,7 @@ class Reader(object):
     def read_lines(self, fnames):
         '''Read single lines from data'''
         for fname in fnames:
-            with open(fname, 'r') as f:
+            with fname.open('r') as f:
                 for line in f:
                     yield self.vocab.lookup([w for w in utils.read_words(line)])
 
@@ -106,15 +105,15 @@ class Reader(object):
 
     def training(self):
         '''Read batches from training data'''
-        yield from self.buffered_read([pjoin(cfg.data_path, 'train.txt')])
+        yield from self.buffered_read([Path(cfg.data_path) / 'train.txt'])
 
     def validation(self):
         '''Read batches from validation data'''
-        yield from self.buffered_read([pjoin(cfg.data_path, 'valid.txt')])
+        yield from self.buffered_read([Path(cfg.data_path) / 'valid.txt'])
 
     def testing(self):
         '''Read batches from testing data'''
-        yield from self.buffered_read([pjoin(cfg.data_path, 'test.txt')])
+        yield from self.buffered_read([Path(cfg.data_path) / 'test.txt'])
 
     def _word_dropout(self, sent):
         ret = []
