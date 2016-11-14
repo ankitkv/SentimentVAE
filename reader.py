@@ -106,18 +106,15 @@ class Reader(object):
 
     def training(self):
         '''Read batches from training data'''
-        for batch in self.buffered_read([pjoin(cfg.data_path, 'train.txt')]):
-            yield batch
+        yield from self.buffered_read([pjoin(cfg.data_path, 'train.txt')])
 
     def validation(self):
         '''Read batches from validation data'''
-        for batch in self.buffered_read([pjoin(cfg.data_path, 'valid.txt')]):
-            yield batch
+        yield from self.buffered_read([pjoin(cfg.data_path, 'valid.txt')])
 
     def testing(self):
         '''Read batches from testing data'''
-        for batch in self.buffered_read([pjoin(cfg.data_path, 'test.txt')]):
-            yield batch
+        yield from self.buffered_read([pjoin(cfg.data_path, 'test.txt')])
 
     def _word_dropout(self, sent):
         ret = []
