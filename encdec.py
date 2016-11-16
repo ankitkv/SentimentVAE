@@ -93,7 +93,12 @@ class EncoderDecoderModel(object):
         with tf.variable_scope("Decoder"):
             z = utils.highway(z)
             z = utils.linear(z, cfg.latent_size, True, scope='decoder_latent')
+            initial = []
+            for i in range(cfg.num_layers):
+                initial.append(tf.nn.tanh(utils.linear(z, cfg.hidden_size, True, 0.0,
+                                                       scope='decoder_initial%d' % i)))
             output, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers, z), inputs,
+                                          initial_state=tuple(initial),
                                           sequence_length=self.lengths-1,
                                           swap_memory=True, dtype=tf.float32)
         return output
