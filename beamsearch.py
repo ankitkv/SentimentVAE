@@ -93,14 +93,14 @@ class BeamDecoder(object):
             dtype = state.dtype
         return dummy._create_state(batch_size, dtype, cell_state=state)
 
-    def wrap_input(self, input):
+    def wrap_input(self, input_):
         """
         Wraps an input for use with the beam decoder.
 
         Should be used for the initial input at timestep zero, as well as any side-channel
         inputs that are per-batch (e.g. attention targets)
         """
-        return self._tile_along_beam(self.beam_size, input)
+        return self._tile_along_beam(self.beam_size, input_)
 
     def unwrap_output_dense(self, final_state, include_stop_tokens=True):
         """

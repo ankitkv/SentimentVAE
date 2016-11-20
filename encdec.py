@@ -9,7 +9,7 @@ class EncoderDecoderModel(object):
 
     '''The variational encoder-decoder model.'''
 
-    def __init__(self, vocab, training):
+    def __init__(self, vocab, training, generator=False):
         self.vocab = vocab
         self.training = training
         self.global_step = tf.get_variable('global_step', shape=[],
@@ -32,10 +32,13 @@ class EncoderDecoderModel(object):
         with tf.name_scope('reverse-embeddings'):
             embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
-        z_mean, z_logvar = self.encoder(embs_reversed[:, 1:, :])
-        with tf.name_scope('reparameterize'):
-            eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
-            self.z = z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
+        if generator:
+            self.z = tf.placeholder(tf.float32, [cfg.batch_size, cfg.latent_size])
+        else:
+            self.z_mean, z_logvar = self.encoder(embs_reversed[:, 1:, :])
+            with tf.name_scope('reparameterize'):
+                eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
+                self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
         output = self.decoder(embs_dropped, self.z)
 
         # shift left the input to get the targets
@@ -49,31 +52,35 @@ class EncoderDecoderModel(object):
             self.summaries.append(tf.scalar_summary('perplexity',
                                                     tf.reduce_mean(self.perplexity)))
         with tf.name_scope('kld-cost'):
-            self.kld = tf.reduce_sum(self.kld_loss(z_mean, z_logvar)) / cfg.batch_size
+            if generator:
+                self.kld = 0.0
+            else:
+                self.kld = tf.reduce_sum(self.kld_loss(self.z_mean, z_logvar)) / \
+                           cfg.batch_size
             self.kld_weight = tf.sigmoid((7 / cfg.anneal_bias)
                                          * (self.global_step - cfg.anneal_bias))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
         with tf.name_scope('cost'):
             self.cost = self.nll + (self.kld_weight * self.kld)
 
-        if training:
+        if training and not generator:
             self.train_op = self.train(self.cost)
         else:
             self.train_op = tf.no_op()
 
 
-    def rnn_cell(self, num_layers, z=None):
+    def rnn_cell(self, num_layers):
         '''Return a multi-layer RNN cell.'''
-        return tf.nn.rnn_cell.MultiRNNCell([rnncell.GRUCell(cfg.hidden_size, latent=z)
+        return tf.nn.rnn_cell.MultiRNNCell([tf.nn.rnn_cell.GRUCell(cfg.hidden_size)
                                             for _ in range(num_layers)])
 
     def word_embeddings(self, inputs, reuse=None):
         '''Look up word embeddings for the input indices.'''
         with tf.device('/cpu:0'), tf.variable_scope("Embeddings", reuse=reuse):
-            embedding = tf.get_variable('word_embedding', [len(self.vocab.vocab),
-                                                           cfg.word_emb_size],
+            self.embedding = tf.get_variable('word_embedding', [len(self.vocab.vocab),
+                                                                cfg.word_emb_size],
                                      initializer=tf.random_uniform_initializer(-1.0, 1.0))
-            embeds = tf.nn.embedding_lookup(embedding, inputs,
+            embeds = tf.nn.embedding_lookup(self.embedding, inputs,
                                             name='word_embedding_lookup')
         return embeds
 
@@ -97,8 +104,10 @@ class EncoderDecoderModel(object):
             for i in range(cfg.num_layers):
                 initial.append(tf.nn.tanh(utils.linear(z, cfg.hidden_size, True, 0.0,
                                                        scope='decoder_initial%d' % i)))
-            output, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers, z), inputs,
-                                          initial_state=tuple(initial),
+            self.decode_initial = tuple(initial)
+            self.decode_cell = self.rnn_cell(cfg.num_layers)
+            output, _ = tf.nn.dynamic_rnn(self.decode_cell, inputs,
+                                          initial_state=self.decode_initial,
                                           sequence_length=self.lengths-1,
                                           swap_memory=True, dtype=tf.float32)
         return output
@@ -108,19 +117,21 @@ class EncoderDecoderModel(object):
         mask = tf.cast(tf.greater(targets, 0, name='targets_mask'), tf.float32)
         output = tf.reshape(tf.concat(1, outputs), [-1, cfg.hidden_size])
         with tf.variable_scope("MLE_Softmax"):
-            softmax_w = tf.get_variable("W", [len(self.vocab.vocab), cfg.hidden_size],
+            self.softmax_w = tf.get_variable("W", [len(self.vocab.vocab),cfg.hidden_size],
                                        initializer=tf.contrib.layers.xavier_initializer())
-            softmax_b = tf.get_variable("b", [len(self.vocab.vocab)],
-                                        initializer=tf.zeros_initializer)
+            self.softmax_b = tf.get_variable("b", [len(self.vocab.vocab)],
+                                             initializer=tf.zeros_initializer)
         if self.training and cfg.softmax_samples < len(self.vocab.vocab):
             targets = tf.reshape(targets, [-1, 1])
             mask = tf.reshape(mask, [-1])
-            loss = tf.nn.sampled_softmax_loss(softmax_w, softmax_b, output, targets,
-                                              cfg.softmax_samples, len(self.vocab.vocab))
+            loss = tf.nn.sampled_softmax_loss(self.softmax_w, self.softmax_b, output,
+                                              targets, cfg.softmax_samples,
+                                              len(self.vocab.vocab))
             loss *= mask
         else:
-            logits = tf.nn.bias_add(tf.matmul(output, tf.transpose(softmax_w),
-                                              name='softmax_transform_mle'), softmax_b)
+            logits = tf.nn.bias_add(tf.matmul(output, tf.transpose(self.softmax_w),
+                                              name='softmax_transform_mle'),
+                                    self.softmax_b)
             loss = tf.nn.seq2seq.sequence_loss_by_example([logits],
                                                           [tf.reshape(targets, [-1])],
                                                           [tf.reshape(mask, [-1])])

@@ -7,19 +7,25 @@ import tensorflow as tf
 from config import cfg
 from encdec import EncoderDecoderModel
 from reader import Reader, Vocab
+import rnncell
+from beamsearch import BeamDecoder
 
 
-def call_mle_session(session, model, batch, summarize=False):
+def call_mle_session(session, model, batch, summarize=False, get_z=False,
+                     get_z_mean=False):
     '''Use the session to run the model on the batch data.'''
     f_dict = {model.data: batch[0],
               model.data_dropped: batch[1],
               model.lengths: batch[2]}
 
+    ops = [model.nll, model.kld, model.cost]
     if summarize:
-        ops = [model.nll, model.kld, model.cost, model.summary(),
-               model.global_step, model.train_op]
-    else:
-        ops = [model.nll, model.kld, model.cost, model.train_op]
+        ops.extend([model.summary(), model.global_step])
+    if get_z:
+        ops.append(model.z)
+    if get_z_mean:
+        ops.append(model.z_mean)
+    ops.append(model.train_op)
     return session.run(ops, f_dict)[:-1]
 
 
@@ -33,8 +39,53 @@ def save_model(session, saver, perp, kld, cur_iters):
     print("Saved to", save_file)
 
 
-def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_steps,
-              summary_writer=None):
+def generate_sentences(model, vocab, beam_size):
+    cell = rnncell.SoftmaxWrapper(model.decode_cell, model.softmax_w, model.softmax_b)
+    initial_state = model.decode_initial
+    initial_input = tf.nn.embedding_lookup(model.embedding, tf.constant(vocab.sos_index,
+                                                                        tf.int32,
+                                                                        [cfg.batch_size]))
+    beam_decoder = BeamDecoder(len(vocab.vocab), beam_size=beam_size,
+                               stop_token=vocab.eos_index, max_len=cfg.max_gen_length)
+
+    _, final_state = tf.nn.seq2seq.rnn_decoder(
+                         [beam_decoder.wrap_input(initial_input)] +
+                                                        [None] * (cfg.max_gen_length - 1),
+                         beam_decoder.wrap_state(initial_state),
+                         beam_decoder.wrap_cell(cell),
+                         loop_function = lambda prev_symbol, i:
+                                      tf.nn.embedding_lookup(model.embedding, prev_symbol)
+                     )
+    return beam_decoder.unwrap_output_dense(final_state)
+
+
+def display_sentences(output, vocab, right_aligned=False):
+    '''Display sentences from indices.'''
+    for i, sent in enumerate(output):
+        print('Sentence %d:' % i, end=' ')
+        words = []
+        for word in sent:
+            # TODO figure out this right-aligned stuff
+#            if right_aligned:
+#                if not word:
+#                    continue
+#            if not word or word == vocab.eos_index:
+#                break
+            words.append(vocab.vocab[word])
+        print(' '.join(words))
+    print()
+
+
+def show_reconstructions(session, model, generate_op, batch, vocab, z):
+    print('\nTrue output')
+    display_sentences(batch[0][:, 1:], vocab)
+    print('Sentences generated from encodings')
+    output = session.run(generate_op, {model.z: z})
+    display_sentences(output, vocab, right_aligned=True)
+
+
+def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, steps,
+              max_steps, generate_op, summary_writer=None):
     '''Runs the model on the given data for an epoch.'''
     start_time = time.time()
     word_count = 0.0
@@ -45,11 +96,13 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
 
     for step, batch in enumerate(batch_loader):
         if step % cfg.print_every == 0 and summary_writer:
-            nll, kld, cost, summary_str, gstep = call_mle_session(session, model,batch,
-                                                                  summarize=True)
+            nll, kld, cost, summary_str, gstep, z = call_mle_session(session, model,
+                                                                     batch,
+                                                                     summarize=True,
+                                                                     get_z=True)
         else:
             nll, kld, cost = call_mle_session(session, model, batch)
-        sentence_length = batch[0].shape[1] - 1 
+        sentence_length = batch[0].shape[1] - 1
         word_count += sentence_length
         kld_weight = session.run(model.kld_weight)
         nlls += nll
@@ -57,6 +110,7 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
         costs += cost
         iters += sentence_length
         if step % cfg.print_every == 0:
+            show_reconstructions(session, generator, generate_op, batch, vocab, z)
             print("%d: %d  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
                   "cost: %.4f  kld_weight: %.3f  speed: %.0f wps" % (epoch + 1, step,
                   np.exp(nll/sentence_length), nll, kld, cost, kld_weight,
@@ -68,7 +122,7 @@ def run_epoch(epoch, session, model, batch_loader, vocab, saver, steps, max_step
         cur_iters = steps + step
         if saver is not None and cur_iters and cfg.save_every > 0 and \
                 cur_iters % cfg.save_every == 0:
-            save_model(session, saver, np.exp(nlls / iters), np.exp(klds / (step + 1)),   
+            save_model(session, saver, np.exp(nlls / iters), np.exp(klds / (step + 1)),
                        cur_iters)
         if max_steps > 0 and cur_iters >= max_steps:
             break
@@ -98,6 +152,9 @@ def main(_):
                     eval_model = EncoderDecoderModel(vocab, False)
             else:
                 test_model = EncoderDecoderModel(vocab, False)
+        with tf.name_scope('generator'):
+            generator = EncoderDecoderModel(vocab, False, True)
+        generate_op = generate_sentences(generator, vocab, cfg.beam_size)
         saver = tf.train.Saver()
         summary_writer = tf.train.SummaryWriter('./summary', session.graph)
         try:
@@ -119,16 +176,17 @@ def main(_):
             model.assign_lr(session, cfg.learning_rate)
             for i in range(cfg.max_epoch):
                 print("\nEpoch: %d  Learning rate: %.5f" % (i + 1, session.run(model.lr)))
-                perplexity, kld, steps = run_epoch(i, session, model, reader.training(),
-                                                   vocab, saver, steps, cfg.max_steps,
+                perplexity, kld, steps = run_epoch(i, session, model, generator,
+                                                   reader.training(), vocab, saver, steps,
+                                                   cfg.max_steps, generate_op,
                                                    summary_writer)
                 print("Epoch: %d Train Perplexity: %.3f, KL Divergence: %.3f"
                       % (i + 1, perplexity, kld))
                 train_losses.append((perplexity, kld))
                 if cfg.validate_every > 0 and (i + 1) % cfg.validate_every == 0:
-                    perplexity, kld, _ = run_epoch(i, session, eval_model,
+                    perplexity, kld, _ = run_epoch(i, session, eval_model, generator,
                                                    reader.validation(), vocab, None, 0,
-                                                   -1, None)
+                                                   -1, generate_op, None)
                     print("Epoch: %d Validation Perplexity: %.3f, KL Divergence: %.3f"
                           % (i + 1, perplexity, kld))
                     valid_losses.append((perplexity, kld))
@@ -140,8 +198,9 @@ def main(_):
                     break
         else:
             print('\nTesting')
-            perplexity, kld, _ = run_epoch(0, session, test_model, reader.testing(),
-                                           vocab, None, 0, cfg.max_steps, None)
+            perplexity, kld, _ = run_epoch(0, session, test_model, generator,
+                                           reader.testing(), vocab, None, 0,
+                                           cfg.max_steps, generate_op, None)
             print("Test Perplexity: %.3f, KL Divergence: %.3f" % (perplexity, kld))
 
 
