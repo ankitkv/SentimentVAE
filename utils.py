@@ -24,15 +24,21 @@ def read_words(line):
             yield word
 
 
-def display_sentences(output, vocab):  # XXX unused
-    '''Display sentences from indices based on vocab.'''
+def display_sentences(output, vocab, right_aligned=False):
+    '''Display sentences from indices.'''
     for i, sent in enumerate(output):
         print('Sentence %d:' % i, end=' ')
+        started = not right_aligned
+        words = []
         for word in sent:
-            if word == vocab.eos_index:
-                break
-            print(vocab.vocab[word], end=' ')
-        print()
+            if not word or word == vocab.eos_index:
+                if started:
+                    break
+            else:
+                if not started:
+                    started = True
+                words.append(vocab.vocab[word])
+        print(' '.join(words))
     print()
 
 
@@ -55,6 +61,19 @@ def get_optimizer(lr, name):
     elif name == 'adadelta':
         optimizer = tf.train.AdadeltaOptimizer(lr)
     return optimizer
+
+
+def list_all_variables(trainable=True, rest=False):
+    trainv = tf.trainable_variables()
+    if trainable:
+        print('\nTrainable:')
+        for v in trainv:
+            print(v.op.name)
+    if rest:
+        print('\nOthers:')
+        for v in tf.all_variables():
+            if v not in trainv:
+                print(v.op.name)
 
 
 def linear(args, output_size, bias, bias_start=0.0, scope=None, initializer=None):

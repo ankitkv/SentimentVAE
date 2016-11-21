@@ -4,11 +4,12 @@ import time
 import numpy as np
 import tensorflow as tf
 
+from beamsearch import BeamDecoder
 from config import cfg
 from encdec import EncoderDecoderModel
 from reader import Reader, Vocab
 import rnncell
-from beamsearch import BeamDecoder
+import utils
 
 
 def call_mle_session(session, model, batch, summarize=False, get_z=False,
@@ -54,34 +55,18 @@ def generate_sentences(model, vocab, beam_size):
                          beam_decoder.wrap_state(initial_state),
                          beam_decoder.wrap_cell(cell),
                          loop_function = lambda prev_symbol, i:
-                                      tf.nn.embedding_lookup(model.embedding, prev_symbol)
+                                     tf.nn.embedding_lookup(model.embedding, prev_symbol),
+                         scope='Decoder/RNN'
                      )
     return beam_decoder.unwrap_output_dense(final_state)
 
 
-def display_sentences(output, vocab, right_aligned=False):
-    '''Display sentences from indices.'''
-    for i, sent in enumerate(output):
-        print('Sentence %d:' % i, end=' ')
-        words = []
-        for word in sent:
-            # TODO figure out this right-aligned stuff
-#            if right_aligned:
-#                if not word:
-#                    continue
-#            if not word or word == vocab.eos_index:
-#                break
-            words.append(vocab.vocab[word])
-        print(' '.join(words))
-    print()
-
-
 def show_reconstructions(session, model, generate_op, batch, vocab, z):
     print('\nTrue output')
-    display_sentences(batch[0][:, 1:], vocab)
+    utils.display_sentences(batch[0][:, 1:], vocab)
     print('Sentences generated from encodings')
     output = session.run(generate_op, {model.z: z})
-    display_sentences(output, vocab, right_aligned=True)
+    utils.display_sentences(output, vocab, right_aligned=True)
 
 
 def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, steps,
@@ -95,11 +80,14 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
     iters = 0
 
     for step, batch in enumerate(batch_loader):
-        if step % cfg.print_every == 0 and summary_writer:
-            nll, kld, cost, summary_str, gstep, z = call_mle_session(session, model,
-                                                                     batch,
-                                                                     summarize=True,
-                                                                     get_z=True)
+        if step % cfg.print_every == 0:
+            if summary_writer:
+                nll, kld, cost, summary_str, gstep, z = call_mle_session(session, model,
+                                                                         batch,
+                                                                         summarize=True,
+                                                                         get_z=True)
+            else:
+                nll, kld, cost, z = call_mle_session(session, model, batch, get_z=True)
         else:
             nll, kld, cost = call_mle_session(session, model, batch)
         sentence_length = batch[0].shape[1] - 1
@@ -147,14 +135,16 @@ def main(_):
             if cfg.training:
                 with tf.name_scope('training'):
                     model = EncoderDecoderModel(vocab, True)
-                with tf.name_scope('evaluation'):
                     scope.reuse_variables()
+                with tf.name_scope('evaluation'):
                     eval_model = EncoderDecoderModel(vocab, False)
             else:
                 test_model = EncoderDecoderModel(vocab, False)
-        with tf.name_scope('generator'):
-            generator = EncoderDecoderModel(vocab, False, True)
-        generate_op = generate_sentences(generator, vocab, cfg.beam_size)
+                scope.reuse_variables()
+            with tf.name_scope('generator'):
+                generator = EncoderDecoderModel(vocab, False, True)
+            with tf.name_scope('beam_search'):
+                generate_op = generate_sentences(generator, vocab, cfg.beam_size)
         saver = tf.train.Saver()
         summary_writer = tf.train.SummaryWriter('./summary', session.graph)
         try:

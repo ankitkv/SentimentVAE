@@ -208,9 +208,11 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         done_symbols = tf.gather(past_beam_symbols, done_parent_refs + done_parent_refs_offsets)
 
         logprobs_done_max = tf.reduce_max(logprobs_done, 1)
+        #logprobs_done_max = tf.Print(logprobs_done_max, [logprobs_done_max, past_cand_logprobs], 'probs', summarize=100)
+        #logprobs_done_max = tf.Print(logprobs_done_max, [done_symbols[:,-1], past_cand_symbols[:,-1]], 'syms', summarize=100)
         cand_symbols = tf.select(logprobs_done_max > past_cand_logprobs,
-                                done_symbols,
-                                past_cand_symbols)
+                                 done_symbols,
+                                 past_cand_symbols)
         cand_logprobs = tf.maximum(logprobs_done_max, past_cand_logprobs)
 
         return outputs, (
