@@ -207,7 +207,10 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         done_parent_refs_offsets = tf.range(batch_size) * self.beam_size
         done_symbols = tf.gather(past_beam_symbols, done_parent_refs + done_parent_refs_offsets)
 
+        non_empty = tf.greater(tf.reduce_sum(tf.cast(tf.not_equal(done_symbols, self.stop_token), tf.int32), 1), 0)
+
         logprobs_done_max = tf.reduce_max(logprobs_done, 1)
+        logprobs_done_max = tf.select(non_empty, logprobs_done_max, tf.ones_like(logprobs_done_max) * -float('inf'))
         #logprobs_done_max = tf.Print(logprobs_done_max, [logprobs_done_max, past_cand_logprobs], 'probs', summarize=100)
         #logprobs_done_max = tf.Print(logprobs_done_max, [done_symbols[:,-1], past_cand_symbols[:,-1]], 'syms', summarize=100)
         cand_symbols = tf.select(logprobs_done_max > past_cand_logprobs,
