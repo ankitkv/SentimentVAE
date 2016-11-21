@@ -27,6 +27,7 @@ flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
 flags.DEFINE_integer("anneal_bias",     3500,    "The step to reach 0.5 for KL "
                                                  "divergence weight annealing")
 flags.DEFINE_bool   ("training",        True,    "Training mode, turn off for testing")
+flags.DEFINE_bool   ("bucket_data",     False,   "Prepare batches by line lengths")
 flags.DEFINE_string ("optimizer",       "adam",  "Optimizer to use (sgd, adam, adagrad, "
                                                  "adadelta)")
 flags.DEFINE_float  ("learning_rate",   1e-3,    "Optimizer initial learning rate")

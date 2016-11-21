@@ -83,11 +83,17 @@ class Reader(object):
         for line in self.read_lines(fnames):
             lines.append(line)
             if len(lines) == buffer_size:
-                lines.sort(key=lambda x: len(x))
+                if cfg.bucket_data:
+                    lines.sort(key=lambda x: len(x))
+                else:
+                    random.shuffle(lines)
                 yield lines
                 lines = []
         if lines:
-            lines.sort(key=lambda x: len(x))
+            if cfg.bucket_data:
+                lines.sort(key=lambda x: len(x))
+            else:
+                random.shuffle(lines)
             mod = len(lines) % cfg.batch_size
             if mod != 0:
                 lines = [[self.vocab.sos_index, self.vocab.eos_index]

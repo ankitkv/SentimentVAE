@@ -90,7 +90,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
             summary_str, gstep = ret[3:5]
         if display_now:
             z = ret[-1]
-        sentence_length = batch[0].shape[1] - 1
+        sentence_length = np.sum(batch[0] != 0) // cfg.batch_size
         word_count += sentence_length
         kld_weight = session.run(model.kld_weight)
         nlls += nll
