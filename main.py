@@ -94,7 +94,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         word_count += sentence_length
         kld_weight = session.run(model.kld_weight)
         nlls += nll
-        klds += nll
+        klds += kld
         costs += cost
         iters += sentence_length
         if print_now:
