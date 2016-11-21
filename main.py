@@ -80,16 +80,16 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
     iters = 0
 
     for step, batch in enumerate(batch_loader):
-        if step % cfg.print_every == 0:
-            if summary_writer:
-                nll, kld, cost, summary_str, gstep, z = call_mle_session(session, model,
-                                                                         batch,
-                                                                         summarize=True,
-                                                                         get_z=True)
-            else:
-                nll, kld, cost, z = call_mle_session(session, model, batch, get_z=True)
-        else:
-            nll, kld, cost = call_mle_session(session, model, batch)
+        print_now = step % cfg.print_every == 0
+        display_now = step % cfg.display_every == 0
+        summarize_now = print_now and summary_writer is not None
+        ret = call_mle_session(session, model, batch, summarize=summarize_now,
+                               get_z=display_now)
+        nll, kld, cost = ret[:3]
+        if summarize_now:
+            summary_str, gstep = ret[3:5]
+        if display_now:
+            z = ret[-1]
         sentence_length = batch[0].shape[1] - 1
         word_count += sentence_length
         kld_weight = session.run(model.kld_weight)
@@ -97,15 +97,16 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         klds += nll
         costs += cost
         iters += sentence_length
-        if step % cfg.print_every == 0:
-            show_reconstructions(session, generator, generate_op, batch, vocab, z)
+        if print_now:
             print("%d: %d  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
-                  "cost: %.4f  kld_weight: %.3f  speed: %.0f wps" % (epoch + 1, step,
+                  "cost: %.4f  kld_weight: %.4f  speed: %.0f wps" % (epoch + 1, step,
                   np.exp(nll/sentence_length), nll, kld, cost, kld_weight,
                   word_count * cfg.batch_size / (time.time() - start_time)))
-
-            if summary_writer:
+            if summary_writer is not None:
                 summary_writer.add_summary(summary_str, gstep)
+
+        if display_now:
+            show_reconstructions(session, generator, generate_op, batch, vocab, z)
 
         cur_iters = steps + step
         if saver is not None and cur_iters and cfg.save_every > 0 and \
