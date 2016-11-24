@@ -1,10 +1,10 @@
 from pathlib import Path
 import pickle
 import random
-
+import csv
 import numpy as np
 import tensorflow as tf
-
+from operator import itemgetter
 from config import cfg
 import utils
 
@@ -14,12 +14,55 @@ class Vocab(object):
     '''Stores the vocab: forward and reverse mappings'''
 
     def __init__(self):
+        self.init_special_tokens()
+
+    def init_special_tokens(self):
         self.vocab = ['<pad>', '<sos>', '<eos>', '<unk>', '<drop>']
         self.vocab_lookup = {w: i for i, w in enumerate(self.vocab)}
+        self.vocab_count = {w: 0 for w in self.vocab}
         self.unk_index = self.vocab_lookup.get('<unk>')
         self.sos_index = self.vocab_lookup.get('<sos>')
         self.eos_index = self.vocab_lookup.get('<eos>')
         self.drop_index = self.vocab_lookup.get('<drop>')  # for word dropout
+
+    def load_by_csv(self, verbose=True):
+        "Load vocabulary from csv files."
+        fnames = Path(cfg.data_path).glob('*.csv')
+        for fname in fnames:
+            if verbose:
+                print('reading csv:', fname)
+            with fname.open('r') as f:
+                for row in csv.reader(f):
+                    line = row[1]
+                    for word in line.split():
+                        c = self.vocab_count.get(word, 0)
+                        c += 1
+                        self.vocab_count[word] = c
+
+        if verbose:
+            print('Read %d words' % len(self.vocab_count))
+
+        self.prune_vocab(cfg.keep_fraction, verbose)
+
+    def prune_vocab(self, keep_fraction, verbose=True):
+        sorted_word_counts = sorted(self.vocab_count.items(), key=itemgetter(1),
+                                        reverse=True)
+        
+        seen_count = 0
+        total_count = sum(self.vocab_count.values())
+        index = 0
+        while seen_count < keep_fraction*total_count:
+            seen_count += sorted_word_counts[index][1]
+            index += 1
+        sorted_word_counts = sorted_word_counts[:index]
+
+        self.init_special_tokens()
+        for word, count in sorted_word_counts:
+            self.vocab_lookup[word] = len(self.vocab)
+            self.vocab.append(word)
+
+        if verbose:
+            print('Keeping %d words after pruning' % len(self.vocab_lookup))
 
     def load_by_parsing(self, save=False, verbose=True):
         '''Read the vocab from the dataset'''
@@ -51,7 +94,7 @@ class Vocab(object):
         except IOError:
             if verbose:
                 print('Error loading from pickle, attempting parsing.')
-            self.load_by_parsing(save=True, verbose=verbose)
+            self.load_by_csv(verbose=verbose)
             with open(pkfile, 'wb') as f:
                 pickle.dump([self.vocab, self.vocab_lookup], f, -1)
                 if verbose:
@@ -150,15 +193,14 @@ def main(_):
     '''Reader tests'''
     vocab = Vocab()
     vocab.load_from_pickle()
-
-    reader = Reader(vocab)
-    for batch in reader.training():
-        for line in batch[0]:
-            print(line)
-            for e in line:
-                print(vocab.vocab[e], end=' ')
-            print()
-            print()
+    reader = csv.reader(open('data/yelp/train.csv'))
+    for row in reader:
+        words = row[1].split()
+        words = [w if w in vocab.vocab_lookup else '<unk>:'+ w for w in words]
+        print(' '. join(words))
+        print()
+        print()
+        input()
 
 
 if __name__ == '__main__':
