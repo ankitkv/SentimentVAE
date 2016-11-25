@@ -9,12 +9,61 @@ from config import cfg
 import utils
 
 
+def read_all_csv_rows(filename):
+    
+    with open(filename) as f:
+        lines = list(csv.reader(f))
+
+    return lines
+
+
+def word_dropout(sent, vocab):
+    ret = []
+    for word in sent:
+        if random.random() < cfg.word_dropout:
+            ret.append(vocab.drop_index)
+        else:
+            ret.append(word)
+    return ret
+
+
+def pack(batch, vocab):
+    '''Pack python-list batches into numpy batches'''
+    max_size = max(len(s) for s in batch)
+    if len(batch) < cfg.batch_size:
+        batch.extend([[] for _ in range(cfg.batch_size - len(batch))])
+    leftalign_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
+    leftalign_drop_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
+    sent_lengths = np.zeros([cfg.batch_size], dtype=np.int32)
+    for i, s in enumerate(batch):
+        leftalign_batch[i, :len(s)] = s
+        leftalign_drop_batch[i, :len(s)] = [s[0]] + word_dropout(s[1:-1], vocab) + \
+                                               [s[-1]]
+        sent_lengths[i] = len(s)
+    return (leftalign_batch, leftalign_drop_batch, sent_lengths)
+
+
+def row_batch_iter(rows, vocab):
+
+    random.shuffle(rows)
+    index = 0
+    while (len(rows) - index) >= cfg.batch_size:
+        csv_rows = rows[index:index + cfg.batch_size]
+        
+        words = [vocab.lookup(row[1].split()) for row in csv_rows]
+        labels = [row[0] for row in csv_rows]
+        sents, dropped_sents, lengths = pack(words, vocab)
+        yield sents, dropped_sents, lengths, labels 
+        index += cfg.batch_size
+
+
 class Vocab(object):
 
     '''Stores the vocab: forward and reverse mappings'''
 
-    def __init__(self):
+    def __init__(self, verbose=True):
         self.init_special_tokens()
+        self.verbose = verbose
 
     def init_special_tokens(self):
         self.vocab = ['<pad>', '<sos>', '<eos>', '<unk>', '<drop>']
@@ -25,11 +74,11 @@ class Vocab(object):
         self.eos_index = self.vocab_lookup.get('<eos>')
         self.drop_index = self.vocab_lookup.get('<drop>')  # for word dropout
 
-    def load_by_csv(self, verbose=True):
+    def load_by_csv(self):
         "Load vocabulary from csv files."
         fnames = Path(cfg.data_path).glob('*.csv')
         for fname in fnames:
-            if verbose:
+            if self.verbose:
                 print('reading csv:', fname)
             with fname.open('r') as f:
                 for row in csv.reader(f):
@@ -39,12 +88,12 @@ class Vocab(object):
                         c += 1
                         self.vocab_count[word] = c
 
-        if verbose:
+        if self.verbose:
             print('Read %d words' % len(self.vocab_count))
 
         self.prune_vocab(cfg.keep_fraction, verbose)
 
-    def prune_vocab(self, keep_fraction, verbose=True):
+    def prune_vocab(self, keep_fraction):
         sorted_word_counts = sorted(self.vocab_count.items(), key=itemgetter(1),
                                         reverse=True)
         
@@ -61,43 +110,26 @@ class Vocab(object):
             self.vocab_lookup[word] = len(self.vocab)
             self.vocab.append(word)
 
-        if verbose:
+        if self.verbose:
             print('Keeping %d words after pruning' % len(self.vocab_lookup))
 
-    def load_by_parsing(self, save=False, verbose=True):
-        '''Read the vocab from the dataset'''
-        if verbose:
-            print('Loading vocabulary by parsing...')
-        fnames = Path(cfg.data_path).glob('*.txt')
-        for fname in fnames:
-            if verbose:
-                print(fname)
-            with fname.open('r') as f:
-                for line in f:
-                    for word in utils.read_words(line):
-                        if word not in self.vocab_lookup:
-                            self.vocab_lookup[word] = len(self.vocab)
-                            self.vocab.append(word)
-        if verbose:
-            print('Vocabulary loaded, size:', len(self.vocab))
-
-    def load_from_pickle(self, verbose=True):
+    def load_from_pickle(self):
         '''Read the vocab from a pickled file'''
         pkfile = cfg.vocab_file
         try:
-            if verbose:
+            if self.verbose:
                 print('Loading vocabulary from pickle...')
             with open(pkfile, 'rb') as f:
                 self.vocab, self.vocab_lookup = pickle.load(f)
-            if verbose:
+            if self.verbose:
                 print('Vocabulary loaded, size:', len(self.vocab))
         except IOError:
-            if verbose:
+            if self.verbose:
                 print('Error loading from pickle, attempting parsing.')
             self.load_by_csv(verbose=verbose)
             with open(pkfile, 'wb') as f:
                 pickle.dump([self.vocab, self.vocab_lookup], f, -1)
-                if verbose:
+                if self.verbose:
                     print('Saved pickle file.')
 
     def lookup(self, words):
@@ -107,101 +139,54 @@ class Vocab(object):
 
 class Reader(object):
 
-    def __init__(self, vocab):
+    def __init__(self, vocab, verbose=True, load=['train', 'validation', 'test']):
         self.vocab = vocab
         random.seed(0)  # deterministic random
+        self.verbose = verbose
 
-    def read_lines(self, fnames):
-        '''Read single lines from data'''
-        for fname in fnames:
-            with fname.open('r') as f:
-                for line in f:
-                    yield self.vocab.lookup([w for w in utils.read_words(line)])
+        if 'train' in load:
+            if self.verbose:
+                print('Loading train csv')
+            self.train_rows = read_all_csv_rows(cfg.data_path + 'train.csv')
+            if self.verbose:
+                print('Training samples = %d' % len(self.train_rows))
 
-    def buffered_read_sorted_lines(self, fnames, batches=50):
-        '''Read and return a list of lines (length multiple of batch_size) worth at most
-           $batches number of batches sorted in length'''
-        buffer_size = cfg.batch_size * batches
-        lines = []
-        for line in self.read_lines(fnames):
-            lines.append(line)
-            if len(lines) == buffer_size:
-                if cfg.bucket_data:
-                    lines.sort(key=lambda x: len(x))
-                else:
-                    random.shuffle(lines)
-                yield lines
-                lines = []
-        if lines:
-            if cfg.bucket_data:
-                lines.sort(key=lambda x: len(x))
-            else:
-                random.shuffle(lines)
-            mod = len(lines) % cfg.batch_size
-            if mod != 0:
-                lines = [[self.vocab.sos_index, self.vocab.eos_index]
-                         for _ in range(cfg.batch_size - mod)] + lines
-            yield lines
+        if 'validation' in load:
+            if self.verbose:
+                print('Loading validation csv')
+            self.validation_rows = read_all_csv_rows(cfg.data_path + 'validation.csv')
+            if self.verbose:
+                print('Validation samples = %d' % len(self.validation_rows))
 
-    def buffered_read(self, fnames):
-        '''Read packed batches from data with each batch having lines of similar lengths
-        '''
-        for line_collection in self.buffered_read_sorted_lines(fnames):
-            batches = [b for b in utils.grouper(cfg.batch_size, line_collection)]
-            random.shuffle(batches)
-            for batch in batches:
-                yield self.pack(batch)
+        if 'test' in load:
+            if self.verbose:
+                print('Loading test csv')
+            self.test_rows = read_all_csv_rows(cfg.data_path + 'test.csv')
+            if self.verbose:
+                print('Testing samples = %d' % len(self.test_rows))
 
     def training(self):
         '''Read batches from training data'''
-        yield from self.buffered_read([Path(cfg.data_path) / 'train.txt'])
+        return row_batch_iter(self.train_rows, self.vocab)
 
     def validation(self):
         '''Read batches from validation data'''
-        yield from self.buffered_read([Path(cfg.data_path) / 'valid.txt'])
+        return row_batch_iter(self.validation_rows, self.vocab)
 
     def testing(self):
         '''Read batches from testing data'''
-        yield from self.buffered_read([Path(cfg.data_path) / 'test.txt'])
-
-    def _word_dropout(self, sent):
-        ret = []
-        for word in sent:
-            if random.random() < cfg.word_dropout:
-                ret.append(self.vocab.drop_index)
-            else:
-                ret.append(word)
-        return ret
-
-    def pack(self, batch):
-        '''Pack python-list batches into numpy batches'''
-        max_size = max(len(s) for s in batch)
-        if len(batch) < cfg.batch_size:
-            batch.extend([[] for _ in range(cfg.batch_size - len(batch))])
-        leftalign_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
-        leftalign_drop_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
-        sent_lengths = np.zeros([cfg.batch_size], dtype=np.int32)
-        for i, s in enumerate(batch):
-            leftalign_batch[i, :len(s)] = s
-            leftalign_drop_batch[i, :len(s)] = [s[0]] + self._word_dropout(s[1:-1]) + \
-                                               [s[-1]]
-            sent_lengths[i] = len(s)
-        return (leftalign_batch, leftalign_drop_batch, sent_lengths)
+        return row_batch_iter(self.test_rows, self.vocab)
 
 
 def main(_):
     '''Reader tests'''
     vocab = Vocab()
     vocab.load_from_pickle()
-    reader = csv.reader(open('data/yelp/train.csv'))
-    for row in reader:
-        words = row[1].split()
-        words = [w if w in vocab.vocab_lookup else '<unk>:'+ w for w in words]
-        print(' '. join(words))
-        print()
-        print()
-        input()
 
+    reader = Reader(vocab, load=['test'])
+    for sents, dropped_sents, lengths, labels in reader.testing():
+        utils.display_sentences(sents, vocab)
+        print()
 
 if __name__ == '__main__':
     tf.app.run()
