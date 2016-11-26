@@ -44,3 +44,12 @@ flags.DEFINE_integer("save_every",      -1,      "Save every these many steps (0
 flags.DEFINE_bool   ("save_overwrite",  True,    "Overwrite the same file each time")
 flags.DEFINE_integer("validate_every",  1,       "Validate every these many epochs (0 "
                                                  "to disable)")
+
+
+print('Config:')
+cfg._parse_flags()
+cfg_dict = cfg.__dict__['__flags']
+maxlen = max(len(k) for k in cfg_dict)
+for k, v in sorted(cfg_dict.items(), key=lambda x: x[0]):
+    print(k.ljust(maxlen + 2), v)
+print()
