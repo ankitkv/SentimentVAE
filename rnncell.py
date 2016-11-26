@@ -1,7 +1,5 @@
 import tensorflow as tf
 
-import utils
-
 
 class SoftmaxWrapper(tf.nn.rnn_cell.RNNCell):
 

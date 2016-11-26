@@ -10,10 +10,14 @@ _, final_state = tf.nn.seq2seq.rnn_decoder(
                         [beam_decoder.wrap_input(initial_input)] + [None] * (MAX_LEN - 1),
                         beam_decoder.wrap_state(initial_state),
                         beam_decoder.wrap_cell(my_cell),
-                        loop_function = lambda prev_symbol, i: tf.nn.embedding_lookup(my_embedding, prev_symbol)
+                        loop_function = lambda prev_symbol,
+                                        i:tf.nn.embedding_lookup(my_embedding,
+                                                                 prev_symbol)
                     )
-best_dense = beam_decoder.unwrap_output_dense(final_state) # Dense tensor output, right-aligned
-best_sparse = beam_decoder.unwrap_output_sparse(final_state) # Output, this time as a sparse tensor
+best_dense = beam_decoder.unwrap_output_dense(final_state) # Dense tensor output,
+                                                             right-aligned
+best_sparse = beam_decoder.unwrap_output_sparse(final_state) # Output, this time as a
+                                                               sparse tensor
 ```
 """
 
@@ -24,17 +28,21 @@ try:
 except ImportError:
     # Backwards-compatibility
     from tensorflow.python.ops import rnn_cell
-    class NestModule(object): pass
+
+    class NestModule(object):
+        pass
     nest = NestModule()
     nest.is_sequence = rnn_cell._is_sequence
     nest.flatten = rnn_cell._unpacked_state
     nest.pack_sequence_as = rnn_cell._packed_state
+
 
 def nest_map(func, nested):
     if not nest.is_sequence(nested):
         return func(nested)
     flat = nest.flatten(nested)
     return nest.pack_sequence_as(nested, list(map(func, flat)))
+
 
 class BeamDecoder(object):
     def __init__(self, num_classes, stop_token=0, beam_size=7, max_len=20):
@@ -81,10 +89,12 @@ class BeamDecoder(object):
         """
         Wraps a cell for use with the beam decoder
         """
-        return BeamDecoderCellWrapper(cell, self.num_classes, self.max_len, self.stop_token, self.beam_size)
+        return BeamDecoderCellWrapper(cell, self.num_classes, self.max_len,
+                                      self.stop_token, self.beam_size)
 
     def wrap_state(self, state):
-        dummy = BeamDecoderCellWrapper(None, self.num_classes, self.max_len, self.stop_token, self.beam_size)
+        dummy = BeamDecoderCellWrapper(None, self.num_classes, self.max_len,
+                                       self.stop_token, self.beam_size)
         if nest.is_sequence(state):
             batch_size = tf.shape(nest.flatten(state)[0])[0]
             dtype = nest.flatten(state)[0].dtype
@@ -110,7 +120,7 @@ class BeamDecoder(object):
         """
         res = final_state[0]
         if include_stop_tokens:
-            res = tf.concat(1, [res[:,1:], tf.ones_like(res[:,0:1]) * self.stop_token])
+            res = tf.concat(1, [res[:, 1:], tf.ones_like(res[:, 0:1]) * self.stop_token])
         return res
 
     def unwrap_output_sparse(self, final_state, include_stop_tokens=True):
@@ -123,8 +133,12 @@ class BeamDecoder(object):
         mask = tf.not_equal(output_dense, self.stop_token)
 
         if include_stop_tokens:
-            output_dense = tf.concat(1, [output_dense[:,1:], tf.ones_like(output_dense[:,0:1]) * self.stop_token])
-            mask = tf.concat(1, [mask[:,1:], tf.cast(tf.ones_like(mask[:,0:1], dtype=tf.int8), tf.bool)])
+            output_dense = tf.concat(1, [output_dense[:, 1:],
+                                         tf.ones_like(output_dense[:, 0:1]) *
+                                         self.stop_token])
+            mask = tf.concat(1, [mask[:, 1:], tf.cast(tf.ones_like(mask[:, 0:1],
+                                                                   dtype=tf.int8),
+                                                      tf.bool)])
 
         return sparse_boolean_mask(output_dense, mask)
 
@@ -134,9 +148,11 @@ class BeamDecoder(object):
         """
         return final_state[1]
 
+
 class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
     def __init__(self, cell, num_classes, max_len, stop_token=0, beam_size=7):
-        # TODO: determine if we can have dynamic shapes instead of pre-filling up to max_len
+        # TODO: determine if we can have dynamic shapes instead of pre-filling up to
+        # max_len
 
         self.cell = cell
         self.num_classes = num_classes
@@ -150,23 +166,24 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         # TODO: consider using slice+fill+concat instead of adding a mask
         # TODO: consider making the large negative constant dtype-dependent
         self._nondone_mask = tf.reshape(
-            tf.cast(tf.equal(tf.range(self.num_classes), self.stop_token), tf.float32) * -1e18,
+            tf.cast(tf.equal(tf.range(self.num_classes), self.stop_token), tf.float32) *
+            -1e18,
             [1, 1, self.num_classes]
         )
-        self._nondone_mask = tf.reshape(tf.tile(self._nondone_mask, [1, self.beam_size, 1]),
-            [-1, self.beam_size*self.num_classes])
+        self._nondone_mask = tf.reshape(tf.tile(self._nondone_mask,
+                                                [1, self.beam_size, 1]),
+                                        [-1, self.beam_size*self.num_classes])
 
     def __call__(self, inputs, state, scope=None):
         (
-            past_cand_symbols, # [batch_size, max_len]
-            past_cand_logprobs,# [batch_size]
-            past_beam_symbols, # [batch_size*self.beam_size, max_len], right-aligned!!!
-            past_beam_logprobs,# [batch_size*self.beam_size]
+            past_cand_symbols,  # [batch_size, max_len]
+            past_cand_logprobs,  # [batch_size]
+            past_beam_symbols,   # [batch_size*self.beam_size, max_len], right-aligned!!!
+            past_beam_logprobs,  # [batch_size*self.beam_size]
             past_cell_state,
                 ) = state
 
-        batch_size = tf.shape(past_cand_symbols)[0] # TODO: get as int, if possible
-        full_size = batch_size * self.beam_size
+        batch_size = tf.shape(past_cand_symbols)[0]  # TODO: get as int, if possible
 
         cell_inputs = inputs
         cell_outputs, raw_cell_state = self.cell(cell_inputs, past_cell_state)
@@ -178,41 +195,50 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         logprobs_batched.set_shape((None, self.beam_size * self.num_classes))
 
         beam_logprobs, indices = tf.nn.top_k(
-            tf.reshape(logprobs_batched + self._nondone_mask, [-1, self.beam_size * self.num_classes]),
+            tf.reshape(logprobs_batched + self._nondone_mask,
+                       [-1, self.beam_size * self.num_classes]),
             self.beam_size
         )
         beam_logprobs = tf.reshape(beam_logprobs, [-1])
 
         # For continuing to the next symbols
-        symbols = indices % self.num_classes # [batch_size, self.beam_size]
-        parent_refs = tf.reshape(indices // self.num_classes, [-1]) # [batch_size*self.beam_size]
+        symbols = indices % self.num_classes  # [batch_size, self.beam_size]
+        # [batch_size*self.beam_size]
+        parent_refs = tf.reshape(indices // self.num_classes, [-1])
 
         # TODO: this technically doesn't need to be recalculated every loop
-        parent_refs_offsets = (tf.range(batch_size * self.beam_size) // self.beam_size) * self.beam_size
+        parent_refs_offsets = ((tf.range(batch_size * self.beam_size) // self.beam_size)
+                               * self.beam_size)
         parent_refs = parent_refs + parent_refs_offsets
 
         symbols_history = tf.gather(past_beam_symbols, parent_refs)
-        beam_symbols = tf.concat(1, [symbols_history[:,1:], tf.reshape(symbols, [-1, 1])])
+        beam_symbols = tf.concat(1, [symbols_history[:, 1:],
+                                     tf.reshape(symbols, [-1, 1])])
 
         # Handle the output and the cell state shuffling
-        outputs = tf.reshape(symbols, [-1]) # [batch_size*beam_size, 1]
+        outputs = tf.reshape(symbols, [-1])  # [batch_size*beam_size, 1]
         cell_state = nest_map(
             lambda element: tf.gather(element, parent_refs),
             raw_cell_state
         )
 
         # Handling for getting a done token
-        logprobs_done = tf.reshape(logprobs_batched, [-1, self.beam_size, self.num_classes])[:,:,self.stop_token]
+        st = self.stop_token
+        logprobs_done = tf.reshape(logprobs_batched, [-1, self.beam_size,
+                                                      self.num_classes])[:, :, st]
         done_parent_refs = tf.to_int32(tf.argmax(logprobs_done, 1))
         done_parent_refs_offsets = tf.range(batch_size) * self.beam_size
-        done_symbols = tf.gather(past_beam_symbols, done_parent_refs + done_parent_refs_offsets)
+        done_symbols = tf.gather(past_beam_symbols, done_parent_refs +
+                                 done_parent_refs_offsets)
 
-        non_empty = tf.greater(tf.reduce_sum(tf.cast(tf.not_equal(done_symbols, self.stop_token), tf.int32), 1), 0)
+        non_empty = tf.greater(tf.reduce_sum(tf.cast(tf.not_equal(done_symbols,
+                                                                  self.stop_token),
+                                                     tf.int32), 1), 0)
 
         logprobs_done_max = tf.reduce_max(logprobs_done, 1)
-        logprobs_done_max = tf.select(non_empty, logprobs_done_max, tf.ones_like(logprobs_done_max) * -float('inf'))
-        #logprobs_done_max = tf.Print(logprobs_done_max, [logprobs_done_max, past_cand_logprobs], 'probs', summarize=100)
-        #logprobs_done_max = tf.Print(logprobs_done_max, [done_symbols[:,-1], past_cand_symbols[:,-1]], 'syms', summarize=100)
+        logprobs_done_max = tf.select(non_empty, logprobs_done_max,
+                                      tf.ones_like(logprobs_done_max) * -float('inf'))
+
         cand_symbols = tf.select(logprobs_done_max > past_cand_logprobs,
                                  done_symbols,
                                  past_cand_symbols)
@@ -232,15 +258,15 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
                 1,
                 self.max_len,
                 1,
-                self.cell.state_size
-               )
+                self.cell.state_size)
 
     @property
     def output_size(self):
         return 1
 
     def _create_state(self, batch_size, dtype, cell_state=None):
-        cand_symbols = tf.fill([batch_size, self.max_len], tf.constant(self.stop_token, dtype=tf.int32))
+        cand_symbols = tf.fill([batch_size, self.max_len], tf.constant(self.stop_token,
+                                                                       dtype=tf.int32))
         cand_logprobs = tf.ones((batch_size,), dtype=tf.float32) * -float('inf')
 
         if cell_state is None:
@@ -251,12 +277,13 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         full_size = batch_size * self.beam_size
         first_in_beam_mask = tf.equal(tf.range(full_size) % self.beam_size, 0)
 
-        beam_symbols = tf.fill([full_size, self.max_len], tf.constant(self.stop_token, dtype=tf.int32))
+        beam_symbols = tf.fill([full_size, self.max_len], tf.constant(self.stop_token,
+                                                                      dtype=tf.int32))
         beam_logprobs = tf.select(
             first_in_beam_mask,
             tf.fill([full_size], 0.0),
-            tf.fill([full_size], -1e18), # top_k does not play well with -inf
-                                         # TODO: dtype-dependent value here
+            tf.fill([full_size], -1e18),  # top_k does not play well with -inf
+                                          # TODO: dtype-dependent value here
         )
         return (
             cand_symbols,
@@ -273,6 +300,7 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         """
         batch_size = batch_size_times_beam_size / self.beam_size
         return self.create_zero_state(batch_size, dtype)
+
 
 def sparse_boolean_mask(tensor, mask):
     """
@@ -293,5 +321,6 @@ def sparse_boolean_mask(tensor, mask):
     return tf.SparseTensor(
         indices=tf.where(left_shifted_mask),
         values=tf.boolean_mask(tensor, mask),
-        shape=tf.cast(tf.pack([mask_shape[0], tf.reduce_max(mask_lens)]), tf.int64) # For 2D only
+        shape=tf.cast(tf.pack([mask_shape[0], tf.reduce_max(mask_lens)]),
+                      tf.int64)  # For 2D only
     )

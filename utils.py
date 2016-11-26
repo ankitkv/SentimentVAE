@@ -1,7 +1,5 @@
 import itertools
 import re
-import sys
-
 import tensorflow as tf
 
 

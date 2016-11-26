@@ -1,7 +1,6 @@
 import tensorflow as tf
 
 from config import cfg
-import rnncell
 import utils
 
 
@@ -68,7 +67,6 @@ class EncoderDecoderModel(object):
         else:
             self.train_op = tf.no_op()
 
-
     def rnn_cell(self, num_layers):
         '''Return a multi-layer RNN cell.'''
         return tf.nn.rnn_cell.MultiRNNCell([tf.nn.rnn_cell.GRUCell(cfg.hidden_size)
@@ -77,9 +75,10 @@ class EncoderDecoderModel(object):
     def word_embeddings(self, inputs, reuse=None):
         '''Look up word embeddings for the input indices.'''
         with tf.device('/cpu:0'), tf.variable_scope("Embeddings", reuse=reuse):
+            init = tf.random_uniform_initializer(-1.0, 1.0)
             self.embedding = tf.get_variable('word_embedding', [len(self.vocab.vocab),
                                                                 cfg.word_emb_size],
-                                     initializer=tf.random_uniform_initializer(-1.0, 1.0))
+                                             initializer=init)
             embeds = tf.nn.embedding_lookup(self.embedding, inputs,
                                             name='word_embedding_lookup')
         return embeds
@@ -117,8 +116,9 @@ class EncoderDecoderModel(object):
         mask = tf.cast(tf.greater(targets, 0, name='targets_mask'), tf.float32)
         output = tf.reshape(tf.concat(1, outputs), [-1, cfg.hidden_size])
         with tf.variable_scope("MLE_Softmax"):
-            self.softmax_w = tf.get_variable("W", [len(self.vocab.vocab),cfg.hidden_size],
-                                       initializer=tf.contrib.layers.xavier_initializer())
+            xinit = tf.contrib.layers.xavier_initializer()
+            self.softmax_w = tf.get_variable("W", [len(self.vocab.vocab),
+                                                   cfg.hidden_size], initializer=xinit)
             self.softmax_b = tf.get_variable("b", [len(self.vocab.vocab)],
                                              initializer=tf.zeros_initializer)
         if self.training and cfg.softmax_samples < len(self.vocab.vocab):

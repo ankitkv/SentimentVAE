@@ -10,7 +10,7 @@ import utils
 
 
 def read_all_csv_rows(filename):
-    
+
     with open(filename) as f:
         lines = list(csv.reader(f))
 
@@ -38,7 +38,7 @@ def pack(batch, vocab):
     for i, s in enumerate(batch):
         leftalign_batch[i, :len(s)] = s
         leftalign_drop_batch[i, :len(s)] = [s[0]] + word_dropout(s[1:-1], vocab) + \
-                                               [s[-1]]
+                                           [s[-1]]
         sent_lengths[i] = len(s)
     return (leftalign_batch, leftalign_drop_batch, sent_lengths)
 
@@ -49,11 +49,11 @@ def row_batch_iter(rows, vocab):
     index = 0
     while (len(rows) - index) >= cfg.batch_size:
         csv_rows = rows[index:index + cfg.batch_size]
-        
+
         words = [vocab.lookup(row[1].split()) for row in csv_rows]
         labels = [row[0] for row in csv_rows]
         sents, dropped_sents, lengths = pack(words, vocab)
-        yield sents, dropped_sents, lengths, labels 
+        yield sents, dropped_sents, lengths, labels
         index += cfg.batch_size
 
 
@@ -95,8 +95,8 @@ class Vocab(object):
 
     def prune_vocab(self, keep_fraction):
         sorted_word_counts = sorted(self.vocab_count.items(), key=itemgetter(1),
-                                        reverse=True)
-        
+                                    reverse=True)
+
         seen_count = 0
         total_count = sum(self.vocab_count.values())
         index = 0

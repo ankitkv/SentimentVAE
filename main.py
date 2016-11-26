@@ -51,11 +51,12 @@ def generate_sentences(model, vocab, beam_size):
 
     _, final_state = tf.nn.seq2seq.rnn_decoder(
                          [beam_decoder.wrap_input(initial_input)] +
-                                                        [None] * (cfg.max_gen_length - 1),
+                         [None] * (cfg.max_gen_length - 1),
                          beam_decoder.wrap_state(initial_state),
                          beam_decoder.wrap_cell(cell),
-                         loop_function = lambda prev_symbol, i:
-                                     tf.nn.embedding_lookup(model.embedding, prev_symbol),
+                         loop_function=lambda prev_symbol, i: tf.nn.embedding_lookup(
+                             model.embedding,
+                             prev_symbol),
                          scope='Decoder/RNN'
                      )
     return beam_decoder.unwrap_output_dense(final_state)
@@ -99,9 +100,9 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         iters += sentence_length
         if print_now:
             print("%d: %d  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
-                  "cost: %.4f  kld_weight: %.4f  speed: %.0f wps" % (epoch + 1, step,
-                  np.exp(nll/sentence_length), nll, kld, cost, kld_weight,
-                  word_count * cfg.batch_size / (time.time() - start_time)))
+                  "cost: %.4f  kld_weight: %.4f  speed: %.0f wps" %
+                  (epoch + 1, step, np.exp(nll/sentence_length), nll, kld, cost,
+                   kld_weight, word_count * cfg.batch_size / (time.time() - start_time)))
             if summary_writer is not None:
                 summary_writer.add_summary(summary_str, gstep)
 
