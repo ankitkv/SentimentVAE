@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 
 flags = tf.flags
@@ -44,7 +45,11 @@ flags.DEFINE_integer("save_every",      -1,      "Save every these many steps (0
 flags.DEFINE_bool   ("save_overwrite",  True,    "Overwrite the same file each time")
 flags.DEFINE_integer("validate_every",  1,       "Validate every these many epochs (0 "
                                                  "to disable)")
+flags.DEFINE_integer("gpu_id",          0,       "The GPU to use")
 
+
+if cfg.gpu_id != 0:
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpu_id)
 
 print('Config:')
 cfg._parse_flags()
