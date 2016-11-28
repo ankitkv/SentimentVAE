@@ -47,7 +47,8 @@ def generate_sentences(model, vocab, beam_size):
     initial_input = tf.nn.embedding_lookup(model.embedding, tf.constant(vocab.sos_index,
                                                                         tf.int32,
                                                                         [cfg.batch_size]))
-    beam_decoder = BeamDecoder(len(vocab.vocab), beam_size=beam_size,
+    batch_concat = tf.nn.embedding_lookup(model.label_embedding, model.labels)
+    beam_decoder = BeamDecoder(len(vocab.vocab), batch_concat, beam_size=beam_size,
                                stop_token=vocab.eos_index, max_len=cfg.max_gen_length)
 
     _, final_state = tf.nn.seq2seq.rnn_decoder(
@@ -64,10 +65,12 @@ def generate_sentences(model, vocab, beam_size):
 
 
 def show_reconstructions(session, model, generate_op, batch, vocab, z):
+    # TODO take this as argument
+    y = np.zeros([cfg.batch_size])
     print('\nTrue output')
     utils.display_sentences(batch[0][:, 1:], vocab)
     print('Sentences generated from encodings')
-    output = session.run(generate_op, {model.z: z})
+    output = session.run(generate_op, {model.z: z, model.labels: y})
     utils.display_sentences(output, vocab, right_aligned=True)
 
 

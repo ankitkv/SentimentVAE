@@ -36,7 +36,7 @@ class EncoderDecoderModel(object):
 
         with tf.name_scope('expand-label-dims'):
             # Compensate for words being shifted by 1
-            length = tf.shape(embs_reversed)[1] - 1
+            length = tf.shape(embs_reversed)[1]
             embs_labels = tf.expand_dims(embs_labels, 1)
             self.embs_labels = tf.tile(embs_labels, [1, length, 1])
 
@@ -45,7 +45,8 @@ class EncoderDecoderModel(object):
         else:
             with tf.name_scope('concat_words_and_labels'):
                 embs_words = embs_reversed[:, 1:, :]
-                embs_words_with_labels = tf.concat(2, [embs_words, self.embs_labels])
+                embs_words_with_labels = tf.concat(2, [embs_words,
+                                                       self.embs_labels[:, 1:, :]])
                 self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
 
             with tf.name_scope('reparameterize'):

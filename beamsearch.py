@@ -45,7 +45,8 @@ def nest_map(func, nested):
 
 
 class BeamDecoder(object):
-    def __init__(self, num_classes, stop_token=0, beam_size=7, max_len=20):
+    def __init__(self, num_classes, batch_concat=None, stop_token=0, beam_size=7,
+                 max_len=20):
         """
         num_classes: int. Number of output classes used
         stop_token: int.
@@ -54,6 +55,7 @@ class BeamDecoder(object):
             than max_len times in a row, the outputs will not be valid!
         """
         self.num_classes = num_classes
+        self.batch_concat = batch_concat
         self.stop_token = stop_token
         self.beam_size = beam_size
         self.max_len = max_len
@@ -89,12 +91,12 @@ class BeamDecoder(object):
         """
         Wraps a cell for use with the beam decoder
         """
-        return BeamDecoderCellWrapper(cell, self.num_classes, self.max_len,
-                                      self.stop_token, self.beam_size)
+        return BeamDecoderCellWrapper(cell, self.batch_concat, self.num_classes,
+                                      self.max_len, self.stop_token, self.beam_size)
 
     def wrap_state(self, state):
-        dummy = BeamDecoderCellWrapper(None, self.num_classes, self.max_len,
-                                       self.stop_token, self.beam_size)
+        dummy = BeamDecoderCellWrapper(None, self.batch_concat, self.num_classes,
+                                       self.max_len, self.stop_token, self.beam_size)
         if nest.is_sequence(state):
             batch_size = tf.shape(nest.flatten(state)[0])[0]
             dtype = nest.flatten(state)[0].dtype
@@ -110,6 +112,7 @@ class BeamDecoder(object):
         Should be used for the initial input at timestep zero, as well as any side-channel
         inputs that are per-batch (e.g. attention targets)
         """
+        #input_ = tf.concat(1, [input_, self.batch_concat])
         return self._tile_along_beam(self.beam_size, input_)
 
     def unwrap_output_dense(self, final_state, include_stop_tokens=True):
@@ -150,11 +153,13 @@ class BeamDecoder(object):
 
 
 class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
-    def __init__(self, cell, num_classes, max_len, stop_token=0, beam_size=7):
+    def __init__(self, cell, batch_concat, num_classes, max_len, stop_token=0,
+                 beam_size=7):
         # TODO: determine if we can have dynamic shapes instead of pre-filling up to
         # max_len
 
         self.cell = cell
+        self.batch_concat = batch_concat
         self.num_classes = num_classes
         self.stop_token = stop_token
         self.beam_size = beam_size
@@ -186,6 +191,8 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         batch_size = tf.shape(past_cand_symbols)[0]  # TODO: get as int, if possible
 
         cell_inputs = inputs
+        cell_inputs = tf.concat(1, [cell_inputs, tf.tile(self.batch_concat,
+                                                         [self.beam_size, 1])])
         cell_outputs, raw_cell_state = self.cell(cell_inputs, past_cell_state)
 
         logprobs = tf.nn.log_softmax(cell_outputs)
