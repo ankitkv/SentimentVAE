@@ -128,7 +128,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
 def main(_):
     vocab = Vocab()
     vocab.load_from_pickle()
-    reader = Reader(vocab)
+    reader = Reader(vocab, load=['testing'])
 
     config_proto = tf.ConfigProto()
     config_proto.gpu_options.allow_growth = True

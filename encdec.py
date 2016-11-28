@@ -25,15 +25,20 @@ class EncoderDecoderModel(object):
                                                name='data_dropped')
             # sentence lengths
             self.lengths = tf.placeholder(tf.int32, [cfg.batch_size], name='lengths')
+            self.labels = tf.placeholder(tf.int32, [cfg.batch_size], name='labels')
 
         embs = self.word_embeddings(self.data)
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
+        embs_labels = self.label_embeddings(self.labels)
+
         with tf.name_scope('reverse-embeddings'):
             embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
         if generator:
             self.z = tf.placeholder(tf.float32, [cfg.batch_size, cfg.latent_size])
         else:
+            print(embs_reversed.get_shape())
+            exit(0)
             self.z_mean, z_logvar = self.encoder(embs_reversed[:, 1:, :])
             with tf.name_scope('reparameterize'):
                 eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
@@ -71,6 +76,17 @@ class EncoderDecoderModel(object):
         '''Return a multi-layer RNN cell.'''
         return tf.nn.rnn_cell.MultiRNNCell([tf.nn.rnn_cell.GRUCell(cfg.hidden_size)
                                             for _ in range(num_layers)])
+
+    def label_embeddings(self, labels, reuse=None):
+        '''Lookup embeddings for labels'''
+        with tf.device('/cpu:0'), tf.variable_scope('Label-Embeddings', reuse=reuse):
+            init = tf.random_uniform_initializer(-1.0, 1.0)
+            self.embedding = tf.get_variable('label_embedding', [len(self.vocab.vocab),
+                                                                 cfg.label_emb_size],
+                                             initializer=init)
+            embeds = tf.nn.embedding_lookup(self.embedding, labels,
+                                            name='label_embedding_lookup')
+        return embeds
 
     def word_embeddings(self, inputs, reuse=None):
         '''Look up word embeddings for the input indices.'''
