@@ -34,23 +34,30 @@ class EncoderDecoderModel(object):
         with tf.name_scope('reverse-embeddings'):
             embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
+        with tf.name_scope('expand-label-dims'):
+            # Compensate for words being shifted by 1
+            length = tf.shape(embs_reversed)[1] - 1
+            embs_labels = tf.expand_dims(embs_labels, 1)
+            self.embs_labels = tf.tile(embs_labels, [1, length, 1])
+
         if generator:
             self.z = tf.placeholder(tf.float32, [cfg.batch_size, cfg.latent_size])
         else:
-            embs_words = embs_reversed[:, 1:, :]
-            #length = tf.shape(embs_words)[1]
-            #embs_labels = tf.expand_dims(embs_labels, 1)
-            #embs_labels = tf.tile(embs_labels, [1, length, 1])
-            #embs_words_with_labels = tf.concat(2, [embs_words, embs_labels])
+            with tf.name_scope('concat_words_and_labels'):
+                embs_words = embs_reversed[:, 1:, :]
+                embs_words_with_labels = tf.concat(2, [embs_words, self.embs_labels])
+                self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
 
-            self.z_mean, z_logvar = self.encoder(embs_words)
             with tf.name_scope('reparameterize'):
                 eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
                 self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
-        output = self.decoder(embs_dropped, self.z)
+
+        with tf.name_scope('concat_words-dropped_and_labels'):
+            embs_words_dropped_with_labels = tf.concat(2, [embs_dropped,
+                                                           self.embs_labels])
+            output = self.decoder(embs_words_dropped_with_labels, self.z)
 
         # shift left the input to get the targets
-
         with tf.name_scope('left-shift'):
             targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
                                                                tf.int32)])
@@ -85,10 +92,11 @@ class EncoderDecoderModel(object):
         '''Lookup embeddings for labels'''
         with tf.device('/cpu:0'), tf.variable_scope('Label-Embeddings', reuse=reuse):
             init = tf.random_uniform_initializer(-1.0, 1.0)
-            self.embedding = tf.get_variable('label_embedding', [len(self.vocab.vocab),
-                                                                 cfg.label_emb_size],
-                                             initializer=init)
-            embeds = tf.nn.embedding_lookup(self.embedding, labels,
+            self.label_embedding = tf.get_variable('label_embedding',
+                                                   [len(self.vocab.vocab),
+                                                    cfg.label_emb_size],
+                                                   initializer=init)
+            embeds = tf.nn.embedding_lookup(self.label_embedding, labels,
                                             name='label_embedding_lookup')
         return embeds
 

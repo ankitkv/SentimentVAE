@@ -17,7 +17,8 @@ def call_mle_session(session, model, batch, summarize=False, get_z=False,
     '''Use the session to run the model on the batch data.'''
     f_dict = {model.data: batch[0],
               model.data_dropped: batch[1],
-              model.lengths: batch[2]}
+              model.lengths: batch[2],
+              model.labels: batch[3]}
 
     ops = [model.nll, model.kld, model.cost]
     if summarize:
