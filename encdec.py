@@ -47,16 +47,20 @@ class EncoderDecoderModel(object):
                 embs_words = embs_reversed[:, 1:, :]
                 embs_words_with_labels = tf.concat(2, [embs_words,
                                                        self.embs_labels[:, 1:, :]])
-                self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
+
+            self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
 
             with tf.name_scope('reparameterize'):
                 eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
                 self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
 
-        with tf.name_scope('concat_words-dropped_and_labels'):
-            embs_words_dropped_with_labels = tf.concat(2, [embs_dropped,
-                                                           self.embs_labels])
-            output = self.decoder(embs_words_dropped_with_labels, self.z)
+        with tf.name_scope('concat_words-labels-z'):
+            # Concatenate dropped word embeddings, label embeddingd and 'z'
+            z = tf.expand_dims(self.z, 1)
+            z = tf.tile(z, [1, length, 1])
+            decode_embs = tf.concat(2, [embs_dropped, self.embs_labels, z])
+
+        output = self.decoder(decode_embs, self.z)
 
         # shift left the input to get the targets
         with tf.name_scope('left-shift'):
