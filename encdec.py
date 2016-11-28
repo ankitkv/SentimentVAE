@@ -37,9 +37,13 @@ class EncoderDecoderModel(object):
         if generator:
             self.z = tf.placeholder(tf.float32, [cfg.batch_size, cfg.latent_size])
         else:
-            print(embs_reversed.get_shape())
-            exit(0)
-            self.z_mean, z_logvar = self.encoder(embs_reversed[:, 1:, :])
+            embs_words = embs_reversed[:, 1:, :]
+            #length = tf.shape(embs_words)[1]
+            #embs_labels = tf.expand_dims(embs_labels, 1)
+            #embs_labels = tf.tile(embs_labels, [1, length, 1])
+            #embs_words_with_labels = tf.concat(2, [embs_words, embs_labels])
+
+            self.z_mean, z_logvar = self.encoder(embs_words)
             with tf.name_scope('reparameterize'):
                 eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
                 self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
