@@ -70,16 +70,21 @@ class EncoderDecoderModel(object):
             targets = tf.concat(1, [self.data[:, 1:], tf.zeros([cfg.batch_size, 1],
                                                                tf.int32)])
         with tf.name_scope('mle-cost'):
-            self.nll = tf.reduce_sum(self.mle_loss(output, targets)) / cfg.batch_size
-            self.perplexity = tf.exp(self.nll/tf.cast(tf.shape(self.data)[1], tf.float32))
-            self.summaries.append(tf.scalar_summary('perplexity',
-                                                    tf.reduce_mean(self.perplexity)))
+            nll_per_word = self.mle_loss(output, targets)
+            avg_lengths = tf.cast(tf.reduce_mean(self.lengths), tf.float32)
+            self.nll = tf.reduce_sum(nll_per_word) / cfg.batch_size
+            self.perplexity = tf.exp(self.nll/avg_lengths)
+            self.summaries.append(tf.scalar_summary('perplexity', self.perplexity))
+            self.summaries.append(tf.scalar_summary('cost_mle', self.nll))
+
         with tf.name_scope('kld-cost'):
             if generator:
                 self.kld = 0.0
             else:
                 self.kld = tf.reduce_sum(self.kld_loss(self.z_mean, z_logvar)) / \
                            cfg.batch_size
+            self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(self.nll)))
+
             self.kld_weight = tf.sigmoid((7.5 / cfg.anneal_bias)
                                          * (self.global_step - cfg.anneal_bias))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
@@ -170,7 +175,6 @@ class EncoderDecoderModel(object):
                                                           [tf.reshape(targets, [-1])],
                                                           [tf.reshape(mask, [-1])])
         loss = tf.reshape(loss, [cfg.batch_size, -1])
-        self.summaries.append(tf.scalar_summary('cost_mle', tf.reduce_mean(loss)))
         return loss
 
     def kld_loss(self, z_mean, z_logvar):
@@ -178,7 +182,6 @@ class EncoderDecoderModel(object):
         z_var = tf.exp(z_logvar)
         z_mean_sq = tf.square(z_mean)
         kld_loss = 0.5 * tf.reduce_sum(z_var + z_mean_sq - 1 - z_logvar, 1)
-        self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(kld_loss)))
         return kld_loss
 
     def train(self, cost):
