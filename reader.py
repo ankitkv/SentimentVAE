@@ -91,7 +91,7 @@ class Vocab(object):
         if self.verbose:
             print('Read %d words' % len(self.vocab_count))
 
-        self.prune_vocab(cfg.keep_fraction, self.verbose)
+        self.prune_vocab(cfg.keep_fraction)
 
     def prune_vocab(self, keep_fraction):
         sorted_word_counts = sorted(self.vocab_count.items(), key=itemgetter(1),
