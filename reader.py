@@ -126,7 +126,7 @@ class Vocab(object):
         except IOError:
             if self.verbose:
                 print('Error loading from pickle, attempting parsing.')
-            self.load_by_csv(verbose=self.verbose)
+            self.load_by_csv()
             with open(pkfile, 'wb') as f:
                 pickle.dump([self.vocab, self.vocab_lookup], f, -1)
                 if self.verbose:
