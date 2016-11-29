@@ -16,14 +16,14 @@ flags.DEFINE_string ("keep_fraction",   0.97,    "Percentage of vocab to keep.")
 
 
 flags.DEFINE_integer("batch_size",      128,     "Batch size")
-flags.DEFINE_integer("word_emb_size",   256,     "Number of learnable dimensions in "
+flags.DEFINE_integer("word_emb_size",   253,     "Number of learnable dimensions in "
                                                  "word embeddings")
 flags.DEFINE_integer("label_emb_size",   3,      "Number of learnable dimensions in "
                                                  "label embeddings")
 flags.DEFINE_integer("num_layers",      1,       "Number of RNN layers")
 flags.DEFINE_integer("max_gen_length",  50,      "Maximum length of generated sentences")
 flags.DEFINE_integer("beam_size",       15,      "Beam size for beam search")
-flags.DEFINE_integer("hidden_size",     192,     "RNN hidden state size")
+flags.DEFINE_integer("hidden_size",     256,     "RNN hidden state size")
 flags.DEFINE_integer("latent_size",     32,      "Latent representation size")
 flags.DEFINE_float  ("word_dropout",    .75,     "Word dropout probability for decoder "
                                                  "input")
@@ -50,9 +50,7 @@ flags.DEFINE_integer("validate_every",  1,       "Validate every these many epoc
                                                  "to disable)")
 flags.DEFINE_integer("gpu_id",          0,       "The GPU to use")
 
-
-if cfg.gpu_id != 0:
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpu_id)
+os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpu_id)
 
 print('Config:')
 cfg._parse_flags()

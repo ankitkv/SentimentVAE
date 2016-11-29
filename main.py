@@ -49,7 +49,7 @@ def generate_sentences(model, vocab, beam_size):
                                                                         [cfg.batch_size]))
     label_embs = tf.nn.embedding_lookup(model.label_embedding, model.labels)
 
-    batch_concat = tf.concat(1, [label_embs, model.z])
+    batch_concat = tf.concat(1, [label_embs, model.z_transformed])
     beam_decoder = BeamDecoder(len(vocab.vocab), batch_concat, beam_size=beam_size,
                                stop_token=vocab.eos_index, max_len=cfg.max_gen_length)
 

@@ -122,7 +122,7 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None, initializer=None
     return res + bias_term
 
 
-def highway(input_, layer_size=1, bias=-2, f=tf.nn.tanh):  # XXX unused
+def highway(input_, layer_size=1, bias=-2, f=tf.nn.tanh):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
     t = sigmoid(Wy + b)
     z = t * g(Wy + b) + (1 - t) * y

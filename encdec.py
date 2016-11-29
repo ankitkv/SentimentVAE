@@ -54,13 +54,16 @@ class EncoderDecoderModel(object):
                 eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
                 self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
 
+        with tf.name_scope('transform-z'):
+            self.z_transformed = utils.highway(self.z, layer_size=2)
+
         with tf.name_scope('concat_words-labels-z'):
             # Concatenate dropped word embeddings, label embeddingd and 'z'
-            z = tf.expand_dims(self.z, 1)
-            z = tf.tile(z, [1, length, 1])
-            decode_embs = tf.concat(2, [embs_dropped, self.embs_labels, z])
+            zt = tf.expand_dims(self.z_transformed, 1)
+            zt = tf.tile(zt, [1, length, 1])
+            decode_embs = tf.concat(2, [embs_dropped, self.embs_labels, zt])
 
-        output = self.decoder(decode_embs, self.z)
+        output = self.decoder(decode_embs, self.z_transformed)
 
         # shift left the input to get the targets
         with tf.name_scope('left-shift'):
@@ -130,8 +133,6 @@ class EncoderDecoderModel(object):
     def decoder(self, inputs, z):
         '''Use the latent representation and word inputs to predict next words.'''
         with tf.variable_scope("Decoder"):
-            z = utils.highway(z)
-            z = utils.linear(z, cfg.latent_size, True, scope='decoder_latent')
             initial = []
             for i in range(cfg.num_layers):
                 initial.append(tf.nn.tanh(utils.linear(z, cfg.hidden_size, True, 0.0,
