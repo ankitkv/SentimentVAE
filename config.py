@@ -50,7 +50,9 @@ flags.DEFINE_integer("validate_every",  1,       "Validate every these many epoc
                                                  "to disable)")
 flags.DEFINE_integer("gpu_id",          0,       "The GPU to use")
 
-os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpu_id)
+
+if cfg.gpu_id != 0:
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpu_id)
 
 print('Config:')
 cfg._parse_flags()
