@@ -55,7 +55,8 @@ class EncoderDecoderModel(object):
                 self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
 
         with tf.name_scope('transform-z'):
-            self.z_transformed = utils.highway(self.z, layer_size=2)
+            z = utils.highway(self.z, layer_size=2, f=tf.nn.elu)
+            self.z_transformed = utils.linear(z, cfg.latent_size, True, scope='transform_z')
 
         with tf.name_scope('concat_words-labels-z'):
             # Concatenate dropped word embeddings, label embeddingd and 'z'
@@ -122,10 +123,15 @@ class EncoderDecoderModel(object):
     def encoder(self, inputs):
         '''Encode sentence and return a latent representation.'''
         with tf.variable_scope("Encoder"):
-            _, state = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
-                                         sequence_length=self.lengths-1, swap_memory=True,
-                                         dtype=tf.float32)
-            z = utils.highway(state)
+            outputs, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
+                                           sequence_length=self.lengths-1, swap_memory=True,
+                                           dtype=tf.float32)
+            outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
+            outputs = utils.highway(outputs, f=tf.nn.elu)
+            outputs = utils.linear(outputs, cfg.latent_size, True, scope='outputs_transform')
+            outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.hidden_size])
+            z = tf.reduce_sum(outputs, [1])
+            z = utils.highway(z, f=tf.nn.elu)
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
             z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')
         return z_mean, z_logvar
