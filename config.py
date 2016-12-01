@@ -15,7 +15,7 @@ flags.DEFINE_string ("vocab_file", "data/yelp/vocab.pk",     "Vocab pickle file"
 flags.DEFINE_string ("keep_fraction",   0.97,    "Percentage of vocab to keep.")
 
 
-flags.DEFINE_integer("batch_size",      128,     "Batch size")
+flags.DEFINE_integer("batch_size",      64,     "Batch size")
 flags.DEFINE_integer("word_emb_size",   253,     "Number of learnable dimensions in "
                                                  "word embeddings")
 flags.DEFINE_integer("label_emb_size",   3,      "Number of learnable dimensions in "

@@ -86,9 +86,9 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
     iters = 0
 
     for step, batch in enumerate(batch_loader):
-        print_now = step % cfg.print_every == 0
-        display_now = step % cfg.display_every == 0
-        summarize_now = print_now and summary_writer is not None
+        print_now = cfg.print_every != 0 and step % cfg.print_every == 0 and step > 0
+        display_now = cfg.display_every != 0 and step % cfg.display_every == 0
+        summarize_now = print_now and summary_writer is not None and step > 0
         ret = call_mle_session(session, model, batch, summarize=summarize_now,
                                get_z=display_now)
         nll, kld, cost = ret[:3]
@@ -134,7 +134,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
 def main(_):
     vocab = Vocab()
     vocab.load_from_pickle()
-    reader = Reader(vocab)#, load=['testing'])
+    reader = Reader(vocab)
 
     config_proto = tf.ConfigProto()
     config_proto.gpu_options.allow_growth = True
