@@ -132,11 +132,11 @@ class EncoderDecoderModel(object):
                                            sequence_length=self.lengths-1, swap_memory=True,
                                            dtype=tf.float32)
             outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
-            outputs = utils.highway(outputs, f=tf.nn.elu)
+            outputs = utils.highway(outputs, f=tf.nn.elu, scope='encoder_output_highway')
             outputs = utils.linear(outputs, cfg.latent_size, True, scope='outputs_transform')
-            outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.hidden_size])
+            outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
             z = tf.reduce_sum(outputs, [1])
-            z = utils.highway(z, f=tf.nn.elu)
+            z = utils.highway(z, f=tf.nn.elu, scope='encoder_pre_z')
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
             z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')
         return z_mean, z_logvar

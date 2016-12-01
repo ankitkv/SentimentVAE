@@ -122,7 +122,7 @@ def linear(args, output_size, bias, bias_start=0.0, scope=None, initializer=None
     return res + bias_term
 
 
-def highway(input_, layer_size=1, bias=-2, f=tf.nn.tanh):
+def highway(input_, layer_size=1, bias=-2, f=tf.nn.tanh, scope=None):
     """Highway Network (cf. http://arxiv.org/abs/1505.00387).
     t = sigmoid(Wy + b)
     z = t * g(Wy + b) + (1 - t) * y
@@ -133,12 +133,13 @@ def highway(input_, layer_size=1, bias=-2, f=tf.nn.tanh):
     if len(shape) != 2:
         raise ValueError("Highway is expecting 2D arguments: %s" % str(shape))
     size = shape[1]
-    for idx in range(layer_size):
-        output = f(linear(input_, size, False, scope='Highway_Nonlin_%d' % idx))
-        transform_gate = tf.sigmoid(linear(input_, size, False,
-                                           scope='Highway_Gate_%d' % idx) + bias)
-        carry_gate = 1.0 - transform_gate
-        output = transform_gate * output + carry_gate * input_
-        input_ = output
+    with tf.variable_scope(scope or "Highway"):
+        for idx in range(layer_size):
+            output = f(linear(input_, size, False, scope='HW_Nonlin_%d' % idx))
+            transform_gate = tf.sigmoid(linear(input_, size, False,
+                                               scope='HW_Gate_%d' % idx) + bias)
+            carry_gate = 1.0 - transform_gate
+            output = transform_gate * output + carry_gate * input_
+            input_ = output
 
     return output
