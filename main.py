@@ -51,8 +51,10 @@ def generate_sentences(model, vocab, beam_size):
                                         model.labels - min(vocab.labels))
 
     batch_concat = tf.concat(1, [label_embs, model.z_transformed])
+    min_op = tf.reduce_min(model.lengths)
     beam_decoder = BeamDecoder(len(vocab.vocab), batch_concat, beam_size=beam_size,
-                               stop_token=vocab.eos_index, max_len=cfg.max_gen_length)
+                               stop_token=vocab.eos_index, max_len=cfg.max_gen_length,
+                               min_op=min_op, min_frac=0.8)
 
     _, final_state = tf.nn.seq2seq.rnn_decoder(
                          [beam_decoder.wrap_input(initial_input)] +
@@ -71,7 +73,8 @@ def show_reconstructions(session, model, generate_op, batch, vocab, z):
     print('\nTrue output')
     utils.display_sentences(batch[0][:, 1:], vocab)
     print('Sentences generated from encodings')
-    output = session.run(generate_op, {model.z: z, model.labels: batch[3]})
+    output = session.run(generate_op, {model.z: z, model.lengths: batch[2],
+                                       model.labels: batch[3]})
     utils.display_sentences(output, vocab, right_aligned=True)
 
 

@@ -46,7 +46,7 @@ def nest_map(func, nested):
 
 class BeamDecoder(object):
     def __init__(self, num_classes, batch_concat=None, stop_token=0, beam_size=7,
-                 max_len=20):
+                 max_len=20, min_op=None, min_frac=0.0):
         """
         num_classes: int. Number of output classes used
         stop_token: int.
@@ -59,6 +59,8 @@ class BeamDecoder(object):
         self.stop_token = stop_token
         self.beam_size = beam_size
         self.max_len = max_len
+        self.min_op = min_op
+        self.min_frac = min_frac
 
     @classmethod
     def _tile_along_beam(cls, beam_size, state):
@@ -92,11 +94,13 @@ class BeamDecoder(object):
         Wraps a cell for use with the beam decoder
         """
         return BeamDecoderCellWrapper(cell, self.batch_concat, self.num_classes,
-                                      self.max_len, self.stop_token, self.beam_size)
+                                      self.max_len, self.stop_token, self.beam_size,
+                                      self.min_op, self.min_frac)
 
     def wrap_state(self, state):
         dummy = BeamDecoderCellWrapper(None, self.batch_concat, self.num_classes,
-                                       self.max_len, self.stop_token, self.beam_size)
+                                       self.max_len, self.stop_token, self.beam_size,
+                                       self.min_op, self.min_frac)
         if nest.is_sequence(state):
             batch_size = tf.shape(nest.flatten(state)[0])[0]
             dtype = nest.flatten(state)[0].dtype
@@ -154,7 +158,7 @@ class BeamDecoder(object):
 
 class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
     def __init__(self, cell, batch_concat, num_classes, max_len, stop_token=0,
-                 beam_size=7):
+                 beam_size=7, min_op=None, min_frac=0.0):
         # TODO: determine if we can have dynamic shapes instead of pre-filling up to
         # max_len
 
@@ -163,6 +167,8 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         self.num_classes = num_classes
         self.stop_token = stop_token
         self.beam_size = beam_size
+        self.min_op = min_op
+        self.min_frac = min_frac
 
         self.max_len = max_len
 
@@ -238,9 +244,13 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         done_symbols = tf.gather(past_beam_symbols, done_parent_refs +
                                  done_parent_refs_offsets)
 
+        if self.min_op is None:
+            min_len = 0
+        else:
+            min_len = tf.cast(tf.cast(self.min_op, tf.float32) * self.min_frac, tf.int32)
         non_empty = tf.greater(tf.reduce_sum(tf.cast(tf.not_equal(done_symbols,
                                                                   self.stop_token),
-                                                     tf.int32), 1), 0)
+                                                     tf.int32), 1), min_len)
 
         logprobs_done_max = tf.reduce_max(logprobs_done, 1)
         logprobs_done_max = tf.select(non_empty, logprobs_done_max,
