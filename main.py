@@ -42,7 +42,8 @@ def save_model(session, saver, perp, kld, cur_iters):
 
 
 def generate_sentences(model, vocab, beam_size):
-    cell = rnncell.SoftmaxWrapper(model.decode_cell, model.softmax_w, model.softmax_b)
+    cell = rnncell.SoftmaxWrapper(model.decode_cell, model.softmax_w, model.softmax_b,
+                                  stddev=cfg.decoding_noise)
     initial_state = model.decode_initial
     initial_input = tf.nn.embedding_lookup(model.embedding, tf.constant(vocab.sos_index,
                                                                         tf.int32,

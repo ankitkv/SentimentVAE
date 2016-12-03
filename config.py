@@ -28,6 +28,8 @@ flags.DEFINE_integer("hidden_size",     512,     "RNN hidden state size")
 flags.DEFINE_integer("latent_size",     48,      "Latent representation size")
 flags.DEFINE_float  ("word_dropout",    .75,     "Word dropout probability for decoder "
                                                  "input")
+flags.DEFINE_float  ("decoding_noise",  0.1,     "StdDev of added noise to states during "
+                                                 "beam search decoding (-1 to disable)")
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
