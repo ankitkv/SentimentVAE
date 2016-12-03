@@ -141,8 +141,8 @@ class EncoderDecoderModel(object):
             outputs = utils.linear(outputs, cfg.latent_size, True,
                                    scope='outputs_transform')
             outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
-            z = tf.nn.tanh(tf.reduce_sum(outputs, [1]))
-            z = utils.highway(z, f=tf.nn.elu, scope='encoder_pre_z')
+            # dividing by 10 to reduce variance of z, to avoid explosion of KLD
+            z = tf.nn.elu(tf.reduce_sum(outputs, [1])) / 10
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
             z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')
         return z_mean, z_logvar
@@ -203,7 +203,13 @@ class EncoderDecoderModel(object):
         optimizer = utils.get_optimizer(self.lr, cfg.optimizer)
         tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         grads = tf.gradients(cost, tvars)
+        #tmp = []
+        #for g, v in zip(grads, tvars):
+        #    tmp.append(tf.Print(tf.reduce_sum(g), [tf.sqrt(tf.reduce_sum(tf.square(g)))],
+        #                        v.op.name, summarize=10))
+        #a = tf.reduce_mean(tf.pack(tmp)) * 0.0
         if cfg.max_grad_norm > 0:
+        #    grads[0] += a
             grads, _ = tf.clip_by_global_norm(grads, cfg.max_grad_norm)
         return optimizer.apply_gradients(list(zip(grads, tvars)),
                                          global_step=self.global_step)
