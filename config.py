@@ -21,11 +21,11 @@ flags.DEFINE_integer("word_emb_size",   253,     "Number of learnable dimensions
 flags.DEFINE_integer("label_emb_size",  3,       "Number of learnable dimensions in "
                                                  "label embeddings")
 flags.DEFINE_bool   ("variational",     True,    "Use variational objective")
-flags.DEFINE_integer("num_layers",      1,       "Number of RNN layers")
+flags.DEFINE_integer("num_layers",      2,       "Number of RNN layers")
 flags.DEFINE_integer("max_gen_length",  50,      "Maximum length of generated sentences")
 flags.DEFINE_integer("beam_size",       15,      "Beam size for beam search")
-flags.DEFINE_integer("hidden_size",     256,     "RNN hidden state size")
-flags.DEFINE_integer("latent_size",     32,      "Latent representation size")
+flags.DEFINE_integer("hidden_size",     512,     "RNN hidden state size")
+flags.DEFINE_integer("latent_size",     48,      "Latent representation size")
 flags.DEFINE_float  ("word_dropout",    .75,     "Word dropout probability for decoder "
                                                  "input")
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
