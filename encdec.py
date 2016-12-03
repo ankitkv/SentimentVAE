@@ -56,7 +56,8 @@ class EncoderDecoderModel(object):
 
         with tf.name_scope('transform-z'):
             z = utils.highway(self.z, layer_size=2, f=tf.nn.elu)
-            self.z_transformed = utils.linear(z, cfg.latent_size, True, scope='transform_z')
+            self.z_transformed = utils.linear(z, cfg.latent_size, True,
+                                              scope='transform_z')
 
         with tf.name_scope('concat_words-labels-z'):
             # Concatenate dropped word embeddings, label embeddingd and 'z'
@@ -64,7 +65,7 @@ class EncoderDecoderModel(object):
             zt = tf.tile(zt, [1, length, 1])
             decode_embs = tf.concat(2, [embs_dropped, self.embs_labels, zt])
 
-        output = self.decoder(decode_embs, self.z_transformed)
+        output = self.decoder(decode_embs, z)
 
         # shift left the input to get the targets
         with tf.name_scope('left-shift'):
@@ -102,15 +103,16 @@ class EncoderDecoderModel(object):
         return tf.nn.rnn_cell.MultiRNNCell([tf.nn.rnn_cell.GRUCell(cfg.hidden_size)
                                             for _ in range(num_layers)])
 
-    def label_embeddings(self, labels, reuse=None):
+    def label_embeddings(self, labels):
         '''Lookup embeddings for labels'''
-        with tf.device('/cpu:0'), tf.variable_scope('Label-Embeddings', reuse=reuse):
+        with tf.device('/cpu:0'), tf.variable_scope('Label-Embeddings'):
             init = tf.random_uniform_initializer(-1.0, 1.0)
             self.label_embedding = tf.get_variable('label_embedding',
-                                                   [len(self.vocab.vocab),
+                                                   [len(self.vocab.labels),
                                                     cfg.label_emb_size],
                                                    initializer=init)
-            embeds = tf.nn.embedding_lookup(self.label_embedding, labels,
+            embeds = tf.nn.embedding_lookup(self.label_embedding,
+                                            labels - min(self.vocab.labels),
                                             name='label_embedding_lookup')
         return embeds
 
@@ -129,13 +131,14 @@ class EncoderDecoderModel(object):
         '''Encode sentence and return a latent representation.'''
         with tf.variable_scope("Encoder"):
             outputs, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
-                                           sequence_length=self.lengths-1, swap_memory=True,
-                                           dtype=tf.float32)
+                                           sequence_length=self.lengths-1,
+                                           swap_memory=True, dtype=tf.float32)
             outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
             outputs = utils.highway(outputs, f=tf.nn.elu, scope='encoder_output_highway')
-            outputs = utils.linear(outputs, cfg.latent_size, True, scope='outputs_transform')
+            outputs = utils.linear(outputs, cfg.latent_size, True,
+                                   scope='outputs_transform')
             outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
-            z = tf.reduce_sum(outputs, [1])
+            z = tf.nn.tanh(tf.reduce_sum(outputs, [1]))
             z = utils.highway(z, f=tf.nn.elu, scope='encoder_pre_z')
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
             z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')

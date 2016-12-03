@@ -47,7 +47,8 @@ def generate_sentences(model, vocab, beam_size):
     initial_input = tf.nn.embedding_lookup(model.embedding, tf.constant(vocab.sos_index,
                                                                         tf.int32,
                                                                         [cfg.batch_size]))
-    label_embs = tf.nn.embedding_lookup(model.label_embedding, model.labels)
+    label_embs = tf.nn.embedding_lookup(model.label_embedding,
+                                        model.labels - min(vocab.labels))
 
     batch_concat = tf.concat(1, [label_embs, model.z_transformed])
     beam_decoder = BeamDecoder(len(vocab.vocab), batch_concat, beam_size=beam_size,
@@ -66,12 +67,11 @@ def generate_sentences(model, vocab, beam_size):
     return beam_decoder.unwrap_output_dense(final_state)
 
 
-def show_reconstructions(session, model, generate_op, batch, vocab, z, labels):
-    # TODO take this as argument
+def show_reconstructions(session, model, generate_op, batch, vocab, z):
     print('\nTrue output')
     utils.display_sentences(batch[0][:, 1:], vocab)
     print('Sentences generated from encodings')
-    output = session.run(generate_op, {model.z: z, model.labels: labels})
+    output = session.run(generate_op, {model.z: z, model.labels: batch[3]})
     utils.display_sentences(output, vocab, right_aligned=True)
 
 
@@ -112,8 +112,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
                 summary_writer.add_summary(summary_str, gstep)
 
         if display_now:
-            labels = batch[3]
-            show_reconstructions(session, generator, generate_op, batch, vocab, z, labels)
+            show_reconstructions(session, generator, generate_op, batch, vocab, z)
 
         cur_iters = steps + step
         if saver is not None and cur_iters and cfg.save_every > 0 and \

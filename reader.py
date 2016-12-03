@@ -21,7 +21,7 @@ def word_dropout(sent, vocab):
     ret = []
     for word in sent:
         if random.random() < cfg.word_dropout:
-            ret.append(vocab.drop_index)
+            ret.append(vocab.unk_index)
         else:
             ret.append(word)
     return ret
@@ -51,7 +51,7 @@ def row_batch_iter(rows, vocab):
         csv_rows = rows[index:index + cfg.batch_size]
 
         words = [vocab.lookup(row[1].split()) for row in csv_rows]
-        labels = [row[0] for row in csv_rows]
+        labels = [int(row[0]) for row in csv_rows]
         sents, dropped_sents, lengths = pack(words, vocab)
         yield sents, dropped_sents, lengths, labels
         index += cfg.batch_size
@@ -66,46 +66,45 @@ class Vocab(object):
         self.verbose = verbose
 
     def init_special_tokens(self):
-        self.vocab = ['<pad>', '<sos>', '<eos>', '<unk>', '<drop>']
+        self.vocab = ['<pad>', '<sos>', '<eos>', '<unk>']
         self.vocab_lookup = {w: i for i, w in enumerate(self.vocab)}
-        self.vocab_count = {w: 0 for w in self.vocab}
+        self.labels = set([])
         self.unk_index = self.vocab_lookup.get('<unk>')
         self.sos_index = self.vocab_lookup.get('<sos>')
         self.eos_index = self.vocab_lookup.get('<eos>')
-        self.drop_index = self.vocab_lookup.get('<drop>')  # for word dropout
 
     def load_by_csv(self):
         "Load vocabulary from csv files."
         fnames = Path(cfg.data_path).glob('*.csv')
+        vocab_count = {w: 0 for w in self.vocab}
         for fname in fnames:
             if self.verbose:
                 print('reading csv:', fname)
             with fname.open('r') as f:
                 for row in csv.reader(f):
                     line = row[1]
+                    self.labels.add(int(row[0]))
                     for word in line.split():
-                        c = self.vocab_count.get(word, 0)
+                        c = vocab_count.get(word, 0)
                         c += 1
-                        self.vocab_count[word] = c
-
+                        vocab_count[word] = c
         if self.verbose:
-            print('Read %d words' % len(self.vocab_count))
+            print('Read %d words' % len(vocab_count))
 
-        self.prune_vocab(cfg.keep_fraction)
+        self.prune_vocab(vocab_count, cfg.keep_fraction)
 
-    def prune_vocab(self, keep_fraction):
-        sorted_word_counts = sorted(self.vocab_count.items(), key=itemgetter(1),
+    def prune_vocab(self, vocab_count, keep_fraction):
+        sorted_word_counts = sorted(vocab_count.items(), key=itemgetter(1),
                                     reverse=True)
 
         seen_count = 0
-        total_count = sum(self.vocab_count.values())
+        total_count = sum(vocab_count.values())
         index = 0
         while seen_count < keep_fraction*total_count:
             seen_count += sorted_word_counts[index][1]
             index += 1
         sorted_word_counts = sorted_word_counts[:index]
 
-        self.init_special_tokens()
         for word, count in sorted_word_counts:
             self.vocab_lookup[word] = len(self.vocab)
             self.vocab.append(word)
@@ -120,7 +119,7 @@ class Vocab(object):
             if self.verbose:
                 print('Loading vocabulary from pickle...')
             with open(pkfile, 'rb') as f:
-                self.vocab, self.vocab_lookup = pickle.load(f)
+                self.vocab, self.vocab_lookup, self.labels = pickle.load(f)
             if self.verbose:
                 print('Vocabulary loaded, size:', len(self.vocab))
         except IOError:
@@ -128,7 +127,7 @@ class Vocab(object):
                 print('Error loading from pickle, attempting parsing.')
             self.load_by_csv()
             with open(pkfile, 'wb') as f:
-                pickle.dump([self.vocab, self.vocab_lookup], f, -1)
+                pickle.dump([self.vocab, self.vocab_lookup, self.labels], f, -1)
                 if self.verbose:
                     print('Saved pickle file.')
 
