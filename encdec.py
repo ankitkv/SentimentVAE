@@ -50,9 +50,12 @@ class EncoderDecoderModel(object):
 
             self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
 
-            with tf.name_scope('reparameterize'):
-                eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
-                self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
+            if cfg.variational:
+                with tf.name_scope('reparameterize'):
+                    eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
+                    self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
+            else:
+                self.z = self.z_mean
 
         with tf.name_scope('transform-z'):
             z = utils.highway(self.z, layer_size=2, f=tf.nn.elu)
@@ -80,8 +83,8 @@ class EncoderDecoderModel(object):
             self.summaries.append(tf.scalar_summary('cost_mle', self.nll))
 
         with tf.name_scope('kld-cost'):
-            if generator:
-                self.kld = 0.0
+            if not cfg.variational or generator:
+                self.kld = tf.zeros([])
             else:
                 self.kld = tf.reduce_sum(self.kld_loss(self.z_mean, z_logvar)) / \
                            cfg.batch_size
