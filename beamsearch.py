@@ -197,8 +197,9 @@ class BeamDecoderCellWrapper(tf.nn.rnn_cell.RNNCell):
         batch_size = tf.shape(past_cand_symbols)[0]  # TODO: get as int, if possible
 
         cell_inputs = inputs
-        cell_inputs = tf.concat(1, [cell_inputs, tf.tile(self.batch_concat,
-                                                         [self.beam_size, 1])])
+        cell_inputs = tf.concat(1, [cell_inputs,
+                                    BeamDecoder._tile_along_beam(self.beam_size,
+                                                                 self.batch_concat)])
         cell_outputs, raw_cell_state = self.cell(cell_inputs, past_cell_state)
 
         logprobs = tf.nn.log_softmax(cell_outputs)
