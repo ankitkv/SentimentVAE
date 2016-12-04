@@ -59,9 +59,9 @@ class EncoderDecoderModel(object):
                 self.z = self.z_mean
 
         with tf.name_scope('transform-z'):
-            z = utils.highway(self.z, layer_size=2, f=tf.nn.elu)
+            z = utils.highway(self.z, layer_size=2, f=tf.nn.elu, scope='transform_z_hw')
             self.z_transformed = utils.linear(z, cfg.latent_size, True,
-                                              scope='transform_z')
+                                              scope='transform_z_lin')
 
         with tf.name_scope('concat_words-labels-z'):
             # Concatenate dropped word embeddings, label embeddingd and 'z'
