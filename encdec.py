@@ -153,8 +153,9 @@ class EncoderDecoderModel(object):
             outputs = utils.highway(outputs, f=tf.nn.elu, scope='encoder_output_highway')
             outputs = utils.linear(outputs, cfg.latent_size, True,
                                    scope='outputs_transform')
-            weights = utils.linear(outputs, cfg.latent_size, True,
-                                   scope='outputs_weights')
+            flat_input = tf.reshape(inputs, [-1, inputs.get_shape()[2].value])
+            weights = utils.linear(tf.concat(1, [flat_input, outputs]), cfg.latent_size,
+                                   True, scope='outputs_attention')
             outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
             weights = tf.reshape(weights, [cfg.batch_size, -1, cfg.latent_size])
             weights = tf.nn.softmax(weights, 1)
