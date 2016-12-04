@@ -90,8 +90,8 @@ class EncoderDecoderModel(object):
                            cfg.batch_size
             self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(self.nll)))
 
-            self.kld_weight = tf.sigmoid((7.5 / cfg.anneal_bias)
-                                         * (self.global_step - cfg.anneal_bias))
+            self.kld_weight = cfg.anneal_max * tf.sigmoid((12 / cfg.anneal_bias)
+                                             * (self.global_step - (cfg.anneal_bias / 2)))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
         with tf.name_scope('cost'):
             self.cost = self.nll + (self.kld_weight * self.kld)

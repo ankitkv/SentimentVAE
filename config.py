@@ -33,8 +33,9 @@ flags.DEFINE_float  ("decoding_noise",  0.1,     "StdDev of added noise to state
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
-flags.DEFINE_integer("anneal_bias",     3500,    "The step to reach 0.5 for KL "
+flags.DEFINE_integer("anneal_bias",     7000,    "The step to reach ~1.0 for KL "
                                                  "divergence weight annealing")
+flags.DEFINE_float  ("anneal_max",      1.0,     "The maximum KL divergence weight")
 flags.DEFINE_bool   ("training",        True,    "Training mode, turn off for testing")
 flags.DEFINE_string ("optimizer",       "adam",  "Optimizer to use (sgd, adam, adagrad, "
                                                  "adadelta)")
