@@ -20,7 +20,7 @@ def call_mle_session(session, model, batch, summarize=False, get_z=False,
               model.lengths: batch[2],
               model.labels: batch[3]}
 
-    ops = [model.nll, model.kld, model.cost]
+    ops = [model.nll, model.kld, model.mutinfo, model.cost]
     if summarize:
         ops.extend([model.summary(), model.global_step])
     if get_z:
@@ -95,9 +95,9 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         summarize_now = print_now and summary_writer is not None and step > 0
         ret = call_mle_session(session, model, batch, summarize=summarize_now,
                                get_z=display_now)
-        nll, kld, cost = ret[:3]
+        nll, kld, mutinfo, cost = ret[:4]
         if summarize_now:
-            summary_str, gstep = ret[3:5]
+            summary_str, gstep = ret[4:6]
         if display_now:
             z = ret[-1]
         sentence_length = np.sum(batch[0] != 0) // cfg.batch_size
@@ -109,8 +109,8 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         iters += sentence_length
         if print_now:
             print("%d: %d  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
-                  "cost: %.4f  kld_weight: %.4f  speed: %.0f wps" %
-                  (epoch + 1, step, np.exp(nll/sentence_length), nll, kld, cost,
+                  "mutinfo_loss: %.4f  cost: %.4f  kld_weight: %.4f  speed: %.0f wps" %
+                  (epoch + 1, step, np.exp(nll/sentence_length), nll, kld, mutinfo, cost,
                    kld_weight, word_count * cfg.batch_size / (time.time() - start_time)))
             if summary_writer is not None:
                 summary_writer.add_summary(summary_str, gstep)

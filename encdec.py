@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 
 from config import cfg
@@ -68,7 +69,10 @@ class EncoderDecoderModel(object):
             zt = tf.tile(zt, [1, length, 1])
             decode_embs = tf.concat(2, [embs_dropped, self.embs_labels, zt])
 
-        output = self.decoder(decode_embs, z)  # TODO use states of decoder to get mutinfo
+        output = self.decoder(decode_embs, z)
+        if cfg.mutual_info:
+            pencoder_embs = tf.concat(2, [embs_dropped, self.embs_labels])
+            zo_mean, zo_logvar = self.output_encoder(pencoder_embs, output)
 
         # shift left the input to get the targets
         with tf.name_scope('left-shift'):
@@ -95,8 +99,9 @@ class EncoderDecoderModel(object):
             if not cfg.mutual_info:
                 self.mutinfo = tf.zeros([])
             else:
-                # TODO
-                self.mutinfo = tf.reduce_sum(self.mutinfo_loss()) / cfg.batch_size
+                self.mutinfo = tf.reduce_sum(self.mutinfo_loss(self.z,
+                                                               zo_mean, zo_logvar)) / \
+                               cfg.batch_size
             self.summaries.append(tf.scalar_summary('cost_mutinfo',
                                                     tf.reduce_mean(self.mutinfo)))
 
@@ -170,6 +175,24 @@ class EncoderDecoderModel(object):
                                           swap_memory=True, dtype=tf.float32)
         return output
 
+    def output_encoder(self, inputs, output):
+        '''Encode decoder outputs and return a proposal posterior.'''
+        with tf.variable_scope("PosteriorProposal"):
+            inputs = tf.concat(2, [inputs, output])
+            outputs, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
+                                           sequence_length=self.lengths-1,
+                                           swap_memory=True, dtype=tf.float32)
+            outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
+            outputs = utils.highway(outputs, f=tf.nn.elu, scope='pencoder_output_highway')
+            outputs = utils.linear(outputs, cfg.latent_size, True,
+                                   scope='poutputs_transform')
+            outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
+            # dividing by 10 to reduce variance of z
+            z = tf.nn.elu(tf.reduce_sum(outputs, [1])) / 10
+            z_mean = utils.linear(z, cfg.latent_size, True, scope='pencoder_z_mean')
+            z_logvar = utils.linear(z, cfg.latent_size, True, scope='pencoder_z_logvar')
+        return z_mean, z_logvar
+
     def mle_loss(self, outputs, targets):
         '''Maximum likelihood estimation loss.'''
         mask = tf.cast(tf.greater(targets, 0, name='targets_mask'), tf.float32)
@@ -203,6 +226,13 @@ class EncoderDecoderModel(object):
         z_mean_sq = tf.square(z_mean)
         kld_loss = 0.5 * tf.reduce_sum(z_var + z_mean_sq - 1 - z_logvar, 1)
         return kld_loss
+
+    def mutinfo_loss(self, z, z_mean, z_logvar):
+        '''Mutual information loss. We want to maximize the likelihood of z in the
+           Gaussian represented by z_mean, z_logvar.'''
+        z_var = tf.exp(z_logvar)
+        z_epsilon = tf.square(z - z_mean)
+        return 0.5 * tf.reduce_sum(tf.log(2 * np.pi) + z_logvar + z_epsilon / z_var, 1)
 
     def train(self, cost):
         '''Generic training helper'''
