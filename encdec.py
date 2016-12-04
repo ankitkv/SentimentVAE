@@ -68,7 +68,7 @@ class EncoderDecoderModel(object):
             zt = tf.tile(zt, [1, length, 1])
             decode_embs = tf.concat(2, [embs_dropped, self.embs_labels, zt])
 
-        output = self.decoder(decode_embs, z)
+        output = self.decoder(decode_embs, z)  # TODO use states of decoder to get mutinfo
 
         # shift left the input to get the targets
         with tf.name_scope('left-shift'):
@@ -81,20 +81,28 @@ class EncoderDecoderModel(object):
             self.perplexity = tf.exp(self.nll/avg_lengths)
             self.summaries.append(tf.scalar_summary('perplexity', self.perplexity))
             self.summaries.append(tf.scalar_summary('cost_mle', self.nll))
-
         with tf.name_scope('kld-cost'):
             if not cfg.variational or generator:
                 self.kld = tf.zeros([])
             else:
                 self.kld = tf.reduce_sum(self.kld_loss(self.z_mean, z_logvar)) / \
                            cfg.batch_size
-            self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(self.nll)))
-
+            self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(self.kld)))
             self.kld_weight = cfg.anneal_max * tf.sigmoid((12 / cfg.anneal_bias)
                                              * (self.global_step - (cfg.anneal_bias / 2)))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
+        with tf.name_scope('mutinfo-cost'):
+            if not cfg.mutual_info:
+                self.mutinfo = tf.zeros([])
+            else:
+                # TODO
+                self.mutinfo = tf.reduce_sum(self.mutinfo_loss()) / cfg.batch_size
+            self.summaries.append(tf.scalar_summary('cost_mutinfo',
+                                                    tf.reduce_mean(self.mutinfo)))
+
         with tf.name_scope('cost'):
-            self.cost = self.nll + (self.kld_weight * self.kld)
+            self.cost = self.nll + (self.kld_weight * self.kld) + \
+                        (cfg.mutinfo_weight * self.mutinfo)
 
         if training and not generator:
             self.train_op = self.train(self.cost)
