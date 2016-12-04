@@ -27,14 +27,14 @@ flags.DEFINE_integer("max_gen_length",  50,      "Maximum length of generated se
 flags.DEFINE_integer("beam_size",       16,      "Beam size for beam search")
 flags.DEFINE_integer("hidden_size",     512,     "RNN hidden state size")
 flags.DEFINE_integer("latent_size",     48,      "Latent representation size")
-flags.DEFINE_float  ("word_dropout",    .75,     "Word dropout probability for decoder "
+flags.DEFINE_float  ("word_dropout",    0.5,     "Word dropout probability for decoder "
                                                  "input")
 flags.DEFINE_float  ("decoding_noise",  0.1,     "StdDev of added noise to states during "
                                                  "beam search decoding (-1 to disable)")
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
-flags.DEFINE_integer("anneal_bias",     6000,    "The step to reach ~1.0 for KL "
+flags.DEFINE_integer("anneal_bias",     8000,    "The step to reach ~1.0 for KL "
                                                  "divergence weight annealing")
 flags.DEFINE_float  ("anneal_max",      1.0,     "The maximum KL divergence weight")
 flags.DEFINE_float  ("mutinfo_weight",  1.0,     "The weight for the mutual info cost")
