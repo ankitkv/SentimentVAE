@@ -221,9 +221,11 @@ class EncoderDecoderModel(object):
     def mutinfo_loss(self, z, z_mean, z_logvar):
         '''Mutual information loss. We want to maximize the likelihood of z in the
            Gaussian represented by z_mean, z_logvar.'''
+        z = tf.stop_gradient(z)  # don't BP to z
         z_var = tf.exp(z_logvar)
-        z_epsilon = tf.square(tf.stop_gradient(z) - z_mean)
-        return 0.5 * tf.reduce_sum(tf.log(2 * np.pi) + z_logvar + z_epsilon / z_var, 1)
+        z_sq = tf.square(z)
+        z_epsilon = tf.square(z - z_mean)
+        return 0.5 * tf.reduce_sum(z_logvar + (z_epsilon / z_var) - z_sq, 1)
 
     def train(self, cost):
         '''Generic training helper'''
