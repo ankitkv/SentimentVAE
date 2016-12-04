@@ -143,9 +143,9 @@ class EncoderDecoderModel(object):
                                             name='word_embedding_lookup')
         return embeds
 
-    def encoder(self, inputs):
+    def encoder(self, inputs, scope=None):
         '''Encode sentence and return a latent representation.'''
-        with tf.variable_scope("Encoder"):
+        with tf.variable_scope(scope or "Encoder"):
             outputs, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
                                            sequence_length=self.lengths-1,
                                            swap_memory=True, dtype=tf.float32)
@@ -153,9 +153,12 @@ class EncoderDecoderModel(object):
             outputs = utils.highway(outputs, f=tf.nn.elu, scope='encoder_output_highway')
             outputs = utils.linear(outputs, cfg.latent_size, True,
                                    scope='outputs_transform')
+            weights = utils.linear(outputs, cfg.latent_size, True,
+                                   scope='outputs_weights')
             outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
-            # dividing by 10 to reduce variance of z, to avoid explosion of KLD
-            z = tf.nn.elu(tf.reduce_sum(outputs, [1])) / 10
+            weights = tf.reshape(weights, [cfg.batch_size, -1, cfg.latent_size])
+            weights = tf.nn.softmax(weights, 1)
+            z = tf.nn.elu(tf.reduce_sum(outputs * weights, [1]))
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
             z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')
         return z_mean, z_logvar
@@ -177,21 +180,7 @@ class EncoderDecoderModel(object):
 
     def output_encoder(self, inputs, output):
         '''Encode decoder outputs and return a proposal posterior.'''
-        with tf.variable_scope("PosteriorProposal"):
-            inputs = tf.concat(2, [inputs, output])
-            outputs, _ = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
-                                           sequence_length=self.lengths-1,
-                                           swap_memory=True, dtype=tf.float32)
-            outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
-            outputs = utils.highway(outputs, f=tf.nn.elu, scope='pencoder_output_highway')
-            outputs = utils.linear(outputs, cfg.latent_size, True,
-                                   scope='poutputs_transform')
-            outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
-            # dividing by 10 to reduce variance of z
-            z = tf.nn.elu(tf.reduce_sum(outputs, [1])) / 10
-            z_mean = utils.linear(z, cfg.latent_size, True, scope='pencoder_z_mean')
-            z_logvar = utils.linear(z, cfg.latent_size, True, scope='pencoder_z_logvar')
-        return z_mean, z_logvar
+        return self.encoder(tf.concat(2, [inputs, output]), scope="PosteriorProposal")
 
     def mle_loss(self, outputs, targets):
         '''Maximum likelihood estimation loss.'''
