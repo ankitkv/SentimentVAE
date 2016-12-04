@@ -71,7 +71,8 @@ class EncoderDecoderModel(object):
 
         output = self.decoder(decode_embs, z)
         if cfg.mutual_info:
-            pencoder_embs = tf.concat(2, [embs_dropped, self.embs_labels])
+            mask = tf.expand_dims(tf.cast(tf.greater(self.data, 0), tf.float32), -1)
+            pencoder_embs = tf.concat(2, [mask, self.embs_labels])
             zo_mean, zo_logvar = self.output_encoder(pencoder_embs, output)
 
         # shift left the input to get the targets
@@ -221,7 +222,7 @@ class EncoderDecoderModel(object):
         '''Mutual information loss. We want to maximize the likelihood of z in the
            Gaussian represented by z_mean, z_logvar.'''
         z_var = tf.exp(z_logvar)
-        z_epsilon = tf.square(z - z_mean)
+        z_epsilon = tf.square(tf.stop_gradient(z) - z_mean)
         return 0.5 * tf.reduce_sum(tf.log(2 * np.pi) + z_logvar + z_epsilon / z_var, 1)
 
     def train(self, cost):
