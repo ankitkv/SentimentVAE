@@ -31,6 +31,8 @@ flags.DEFINE_float  ("word_dropout",    0.5,     "Word dropout probability for d
                                                  "input")
 flags.DEFINE_float  ("decoding_noise",  0.1,     "StdDev of added noise to states during "
                                                  "beam search decoding (-1 to disable)")
+flags.DEFINE_float  ("length_penalty",  75.0,    "Bias beamsearch logprobs by "
+                                                 "lp * log(curlen / targetlen)")
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")

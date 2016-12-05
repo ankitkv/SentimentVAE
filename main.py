@@ -55,7 +55,7 @@ def generate_sentences(model, vocab, beam_size):
     min_op = model.lengths
     beam_decoder = BeamDecoder(len(vocab.vocab), batch_concat, beam_size=beam_size,
                                stop_token=vocab.eos_index, max_len=cfg.max_gen_length,
-                               min_op=min_op, min_frac=0.75)
+                               min_op=min_op, length_penalty=cfg.length_penalty)
 
     _, final_state = tf.nn.seq2seq.rnn_decoder(
                          [beam_decoder.wrap_input(initial_input)] +
