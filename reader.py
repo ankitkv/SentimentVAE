@@ -6,7 +6,14 @@ import numpy as np
 import tensorflow as tf
 from operator import itemgetter
 from config import cfg
+import itertools
 import utils
+
+
+def grouper(n, iterable, fillvalue=None):
+    "grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return itertools.zip_longest(*args, fillvalue=fillvalue)
 
 
 def read_all_csv_rows(filename):
@@ -42,19 +49,34 @@ def pack(batch, vocab):
         sent_lengths[i] = len(s)
     return (leftalign_batch, leftalign_drop_batch, sent_lengths)
 
+def is_batch_valid(batch):
+    return batch[-1] is not None
+
+
+def csv_to_numpy(csv_batch, vocab):
+    "Convert a batch of csv rows to numpy arrays."
+
+    words = [vocab.lookup(row[1].split()) for row in csv_batch]
+    labels = [int(row[0]) for row in csv_batch]
+    sents, dropped_sents, lengths = pack(words, vocab)
+    return sents, dropped_sents, lengths, labels
+
+
+def sentence_length(row):
+    return len(row[1])
+
 
 def row_batch_iter(rows, vocab):
 
-    random.shuffle(rows)
-    index = 0
-    while (len(rows) - index) >= cfg.batch_size:
-        csv_rows = rows[index:index + cfg.batch_size]
+    if cfg.group_length:
+        rows.sort(key=sentence_length)
 
-        words = [vocab.lookup(row[1].split()) for row in csv_rows]
-        labels = [int(row[0]) for row in csv_rows]
-        sents, dropped_sents, lengths = pack(words, vocab)
-        yield sents, dropped_sents, lengths, labels
-        index += cfg.batch_size
+    csv_batches = list(grouper(cfg.batch_size, rows, None))
+    random.shuffle(csv_batches)
+    index = 0
+    for batch in csv_batches:
+        if is_batch_valid(batch):
+            yield csv_to_numpy(batch, vocab)
 
 
 class Vocab(object):
@@ -186,6 +208,7 @@ def main(_):
     for sents, dropped_sents, lengths, labels in reader.testing():
         utils.display_sentences(sents, vocab)
         print()
+
 
 if __name__ == '__main__':
     tf.app.run()
