@@ -88,12 +88,12 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
     klds = 0.0
     costs = 0.0
     iters = 0
+    global_step = session.run(model.global_step)
 
     for step, batch in enumerate(batch_loader):
-        cur_iters = steps + step
         drop_prob = utils.linear_interpolation(cfg.init_dropout, cfg.word_dropout,
                                                cfg.dropout_start, cfg.dropout_finish,
-                                               cur_iters)
+                                               global_step + step)
         dropped = utils.word_dropout(batch[0], batch[1], vocab, drop_prob)
         batch = batch + (dropped,)
 
@@ -125,6 +125,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         if display_now:
             show_reconstructions(session, generator, generate_op, batch, vocab, z)
 
+        cur_iters = steps + step
         if saver is not None and cur_iters and cfg.save_every > 0 and \
                 cur_iters % cfg.save_every == 0:
             save_model(session, saver, np.exp(nlls / iters), np.exp(klds / (step + 1)),
