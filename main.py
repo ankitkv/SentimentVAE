@@ -16,9 +16,9 @@ def call_mle_session(session, model, batch, summarize=False, get_z=False,
                      get_z_mean=False):
     '''Use the session to run the model on the batch data.'''
     f_dict = {model.data: batch[0],
-              model.data_dropped: batch[1],
-              model.lengths: batch[2],
-              model.labels: batch[3]}
+              model.data_dropped: batch[3],
+              model.lengths: batch[1],
+              model.labels: batch[2]}
 
     ops = [model.nll, model.kld, model.mutinfo, model.cost]
     if summarize:
@@ -74,8 +74,8 @@ def show_reconstructions(session, model, generate_op, batch, vocab, z):
     print('\nTrue output')
     utils.display_sentences(batch[0][:, 1:], vocab)
     print('Sentences generated from encodings')
-    output = session.run(generate_op, {model.z: z, model.lengths: batch[2],
-                                       model.labels: batch[3]})
+    output = session.run(generate_op, {model.z: z, model.lengths: batch[1],
+                                       model.labels: batch[2]})
     utils.display_sentences(output, vocab, right_aligned=True)
 
 
@@ -90,6 +90,13 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
     iters = 0
 
     for step, batch in enumerate(batch_loader):
+        cur_iters = steps + step
+        drop_prob = utils.linear_interpolation(cfg.init_dropout, cfg.word_dropout,
+                                               cfg.dropout_start, cfg.dropout_finish,
+                                               cur_iters)
+        dropped = utils.word_dropout(batch[0], batch[1], vocab, drop_prob)
+        batch = batch + (dropped,)
+
         print_now = cfg.print_every != 0 and step % cfg.print_every == 0 and step > 0
         display_now = cfg.display_every != 0 and step % cfg.display_every == 0
         summarize_now = print_now and summary_writer is not None and step > 0
@@ -118,7 +125,6 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         if display_now:
             show_reconstructions(session, generator, generate_op, batch, vocab, z)
 
-        cur_iters = steps + step
         if saver is not None and cur_iters and cfg.save_every > 0 and \
                 cur_iters % cfg.save_every == 0:
             save_model(session, saver, np.exp(nlls / iters), np.exp(klds / (step + 1)),

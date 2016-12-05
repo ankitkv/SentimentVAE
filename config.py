@@ -28,8 +28,12 @@ flags.DEFINE_integer("max_gen_length",  50,      "Maximum length of generated se
 flags.DEFINE_integer("beam_size",       16,      "Beam size for beam search")
 flags.DEFINE_integer("hidden_size",     512,     "RNN hidden state size")
 flags.DEFINE_integer("latent_size",     48,      "Latent representation size")
-flags.DEFINE_float  ("word_dropout",    0.5,     "Word dropout probability for decoder "
-                                                 "input")
+flags.DEFINE_integer("dropout_start",   4000,    "Start reducing dropout at this step")
+flags.DEFINE_integer("dropout_finish",  13000,   "Stop reducing dropout at this step")
+flags.DEFINE_float  ("init_dropout",    0.95,    "Initial word dropout probability for "
+                                                 "decoder input")
+flags.DEFINE_float  ("word_dropout",    0.2,     "Final word dropout probability for "
+                                                 "decoder input")
 flags.DEFINE_float  ("decoding_noise",  0.1,     "StdDev of added noise to states during "
                                                  "beam search decoding (-1 to disable)")
 flags.DEFINE_float  ("length_penalty",  75.0,    "Bias beamsearch logprobs by "

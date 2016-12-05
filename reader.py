@@ -24,30 +24,17 @@ def read_all_csv_rows(filename):
     return lines
 
 
-def word_dropout(sent, vocab):
-    ret = []
-    for word in sent:
-        if random.random() < cfg.word_dropout:
-            ret.append(vocab.unk_index)
-        else:
-            ret.append(word)
-    return ret
-
-
 def pack(batch, vocab):
     '''Pack python-list batches into numpy batches'''
     max_size = max(len(s) for s in batch)
     if len(batch) < cfg.batch_size:
         batch.extend([[] for _ in range(cfg.batch_size - len(batch))])
     leftalign_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
-    leftalign_drop_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
     sent_lengths = np.zeros([cfg.batch_size], dtype=np.int32)
     for i, s in enumerate(batch):
         leftalign_batch[i, :len(s)] = s
-        leftalign_drop_batch[i, :len(s)] = [s[0]] + word_dropout(s[1:-1], vocab) + \
-                                           [s[-1]]
         sent_lengths[i] = len(s)
-    return (leftalign_batch, leftalign_drop_batch, sent_lengths)
+    return (leftalign_batch, sent_lengths)
 
 def is_batch_valid(batch):
     return batch[-1] is not None
@@ -58,8 +45,8 @@ def csv_to_numpy(csv_batch, vocab):
 
     words = [vocab.lookup(row[1].split()) for row in csv_batch]
     labels = [int(row[0]) for row in csv_batch]
-    sents, dropped_sents, lengths = pack(words, vocab)
-    return sents, dropped_sents, lengths, labels
+    sents, lengths = pack(words, vocab)
+    return sents, lengths, labels
 
 
 def sentence_length(row):
@@ -205,7 +192,7 @@ def main(_):
     vocab.load_from_pickle()
 
     reader = Reader(vocab, load=['test'])
-    for sents, dropped_sents, lengths, labels in reader.testing():
+    for sents, lengths, labels in reader.testing():
         utils.display_sentences(sents, vocab)
         print()
 

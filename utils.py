@@ -1,6 +1,7 @@
 import itertools
 import re
 import tensorflow as tf
+import numpy as np
 
 
 fix_re = re.compile(r'''[^a-z0-9"'?.,]+''')
@@ -20,6 +21,25 @@ def read_words(line):
             word = fix_word(word)
         if word:
             yield word
+
+
+def linear_interpolation(init_val, final_val, start, finish, current):
+    if current <= start:
+        return init_val
+    elif current >= finish:
+        return final_val
+    else:
+        return ((final_val - init_val) * (current - start) / (finish - start)) + init_val
+
+
+def word_dropout(sents, lengths, vocab, drop_prob):
+    dropped = np.random.binomial(1, drop_prob, size=sents.shape)
+    ret = sents.copy()
+    for i in range(sents.shape[0]):
+        for j in range(1, lengths[i] - 1):
+            if dropped[i, j]:
+                ret[i, j] = vocab.unk_index
+    return ret
 
 
 def display_sentences(output, vocab, right_aligned=False):
