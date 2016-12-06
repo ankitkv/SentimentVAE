@@ -170,15 +170,26 @@ class EncoderDecoderModel(object):
                                            swap_memory=True, dtype=tf.float32)
             outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
             outputs = utils.highway(outputs, f=tf.nn.elu, scope='encoder_output_highway')
-            outputs = utils.linear(outputs, cfg.latent_size, True,
-                                   scope='outputs_transform')
-            flat_input = tf.reshape(inputs, [-1, inputs.get_shape()[2].value])
-            weights = utils.linear(tf.concat(1, [flat_input, outputs]), cfg.latent_size,
-                                   True, scope='outputs_attention')
-            outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
-            weights = tf.reshape(weights, [cfg.batch_size, -1, cfg.latent_size])
-            weights = tf.nn.softmax(weights, 1)
-            z = tf.nn.elu(tf.reduce_sum(outputs * weights, [1]))
+            if cfg.encoder_summary == 'attention':
+                flat_input = tf.reshape(inputs, [-1, inputs.get_shape()[2].value])
+                weights = utils.linear(tf.concat(1, [flat_input, outputs]),
+                                       cfg.hidden_size, True, scope='outputs_attention')
+                outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.hidden_size])
+                weights = tf.reshape(weights, [cfg.batch_size, -1, cfg.hidden_size])
+                weights = tf.nn.softmax(weights, 1)
+                z = tf.reduce_sum(outputs * weights, [1])
+                z = tf.nn.elu(utils.linear(z, cfg.latent_size, True,
+                                           scope='outputs_transform'))
+            else:
+                outputs = utils.linear(outputs, cfg.latent_size, True,
+                                       scope='outputs_transform')
+                outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
+                if cfg.encoder_summary == 'mean':
+                    z = tf.nn.elu(tf.reduce_mean(outputs, [1]))
+                elif cfg.encoder_summary == 'laststate':
+                    z = outputs[:, -1, :]
+                else:
+                    raise ValueError('Invalid encoder_summary configuration.')
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
             z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')
         return z_mean, z_logvar
