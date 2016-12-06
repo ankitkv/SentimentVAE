@@ -26,28 +26,34 @@ class EncoderDecoderModel(object):
                                                name='data_dropped')
             # sentence lengths
             self.lengths = tf.placeholder(tf.int32, [cfg.batch_size], name='lengths')
-            self.labels = tf.placeholder(tf.int32, [cfg.batch_size], name='labels')
+            if cfg.use_labels:
+                self.labels = tf.placeholder(tf.int32, [cfg.batch_size], name='labels')
 
         embs = self.word_embeddings(self.data)
         embs_dropped = self.word_embeddings(self.data_dropped, reuse=True)
-        embs_labels = self.label_embeddings(self.labels)
+        if cfg.use_labels:
+            embs_labels = self.label_embeddings(self.labels)
 
         with tf.name_scope('reverse-embeddings'):
             embs_reversed = tf.reverse_sequence(embs, self.lengths, 1)
 
-        with tf.name_scope('expand-label-dims'):
-            # Compensate for words being shifted by 1
-            length = tf.shape(embs_reversed)[1]
-            embs_labels = tf.expand_dims(embs_labels, 1)
-            self.embs_labels = tf.tile(embs_labels, [1, length, 1])
+        if cfg.use_labels:
+            with tf.name_scope('expand-label-dims'):
+                # Compensate for words being shifted by 1
+                embs_labels = tf.expand_dims(embs_labels, 1)
+                self.embs_labels = tf.tile(embs_labels,
+                                           [1, tf.shape(embs_reversed)[1], 1])
 
         if generator:
             self.z = tf.placeholder(tf.float32, [cfg.batch_size, cfg.latent_size])
         else:
             with tf.name_scope('concat_words_and_labels'):
                 embs_words = embs_reversed[:, 1:, :]
-                embs_words_with_labels = tf.concat(2, [embs_words,
-                                                       self.embs_labels[:, 1:, :]])
+                if cfg.use_labels:
+                    embs_words_with_labels = tf.concat(2, [embs_words,
+                                                           self.embs_labels[:, 1:, :]])
+                else:
+                    embs_words_with_labels = embs_words
 
             self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
 
@@ -66,13 +72,19 @@ class EncoderDecoderModel(object):
         with tf.name_scope('concat_words-labels-z'):
             # Concatenate dropped word embeddings, label embeddingd and 'z'
             zt = tf.expand_dims(self.z_transformed, 1)
-            zt = tf.tile(zt, [1, length, 1])
-            decode_embs = tf.concat(2, [embs_dropped, self.embs_labels, zt])
+            zt = tf.tile(zt, [1, tf.shape(embs_dropped)[1], 1])
+            concat_list = [embs_dropped, zt]
+            if cfg.use_labels:
+                concat_list.append(self.embs_labels)
+            decode_embs = tf.concat(2, concat_list)
 
         output = self.decoder(decode_embs, z)
         if cfg.mutual_info:
             mask = tf.expand_dims(tf.cast(tf.greater(self.data, 0), tf.float32), -1)
-            pencoder_embs = tf.concat(2, [mask, self.embs_labels])
+            if cfg.use_labels:
+                pencoder_embs = tf.concat(2, [mask, self.embs_labels])
+            else:
+                pencoder_embs = mask
             zo_mean, zo_logvar = self.output_encoder(pencoder_embs, output)
 
         # shift left the input to get the targets

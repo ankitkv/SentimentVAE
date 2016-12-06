@@ -21,6 +21,7 @@ flags.DEFINE_integer("word_emb_size",   253,     "Number of learnable dimensions
                                                  "word embeddings")
 flags.DEFINE_integer("label_emb_size",  3,       "Number of learnable dimensions in "
                                                  "label embeddings")
+flags.DEFINE_bool   ("use_labels",      False,   "Use labels to condition on")
 flags.DEFINE_bool   ("variational",     True,    "Use variational objective")
 flags.DEFINE_bool   ("mutual_info",     True,    "Use mutual information objective")
 flags.DEFINE_integer("num_layers",      2,       "Number of RNN layers")

@@ -17,8 +17,9 @@ def call_mle_session(session, model, batch, summarize=False, get_z=False,
     '''Use the session to run the model on the batch data.'''
     f_dict = {model.data: batch[0],
               model.data_dropped: batch[3],
-              model.lengths: batch[1],
-              model.labels: batch[2]}
+              model.lengths: batch[1]}
+    if cfg.use_labels:
+        f_dict[model.labels] = batch[2]
 
     ops = [model.nll, model.kld, model.mutinfo, model.cost]
     if summarize:
@@ -48,10 +49,13 @@ def generate_sentences(model, vocab, beam_size):
     initial_input = tf.nn.embedding_lookup(model.embedding, tf.constant(vocab.sos_index,
                                                                         tf.int32,
                                                                         [cfg.batch_size]))
-    label_embs = tf.nn.embedding_lookup(model.label_embedding,
-                                        model.labels - min(vocab.labels))
+    if cfg.use_labels:
+        label_embs = tf.nn.embedding_lookup(model.label_embedding,
+                                            model.labels - min(vocab.labels))
 
-    batch_concat = tf.concat(1, [label_embs, model.z_transformed])
+        batch_concat = tf.concat(1, [model.z_transformed, label_embs])
+    else:
+        batch_concat = model.z_transformed
     min_op = model.lengths
     beam_decoder = BeamDecoder(len(vocab.vocab), batch_concat, beam_size=beam_size,
                                stop_token=vocab.eos_index, max_len=cfg.max_gen_length,
@@ -74,8 +78,10 @@ def show_reconstructions(session, model, generate_op, batch, vocab, z):
     print('\nTrue output')
     utils.display_sentences(batch[0][:, 1:], vocab)
     print('Sentences generated from encodings')
-    output = session.run(generate_op, {model.z: z, model.lengths: batch[1],
-                                       model.labels: batch[2]})
+    f_dict = {model.z: z, model.lengths: batch[1]}
+    if cfg.use_labels:
+        f_dict[model.labels] = batch[2]
+    output = session.run(generate_op, f_dict)
     utils.display_sentences(output, vocab, right_aligned=True)
 
 
