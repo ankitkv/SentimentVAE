@@ -73,7 +73,13 @@ class EncoderDecoderModel(object):
             # Concatenate dropped word embeddings, label embeddingd and 'z'
             zt = tf.expand_dims(self.z_transformed, 1)
             zt = tf.tile(zt, [1, tf.shape(embs_dropped)[1], 1])
-            concat_list = [embs_dropped, zt]
+            concat_list = []
+            if cfg.decoder_inputs:
+                concat_list.append(embs_dropped)
+            else:
+                concat_list.append(tf.zeros([cfg.batch_size, tf.shape(embs_dropped)[1],
+                                             1]))
+            concat_list.append(zt)
             if cfg.use_labels:
                 concat_list.append(self.embs_labels)
             decode_embs = tf.concat(2, concat_list)

@@ -46,9 +46,12 @@ def generate_sentences(model, vocab, beam_size):
     cell = rnncell.SoftmaxWrapper(model.decode_cell, model.softmax_w, model.softmax_b,
                                   stddev=cfg.decoding_noise)
     initial_state = model.decode_initial
-    initial_input = tf.nn.embedding_lookup(model.embedding, tf.constant(vocab.sos_index,
-                                                                        tf.int32,
-                                                                        [cfg.batch_size]))
+    if cfg.decoder_inputs:
+        initial_input = tf.nn.embedding_lookup(model.embedding,
+                                               tf.constant(vocab.sos_index, tf.int32,
+                                                           [cfg.batch_size]))
+    else:
+        initial_input = tf.zeros([cfg.batch_size, 1])
     if cfg.use_labels:
         label_embs = tf.nn.embedding_lookup(model.label_embedding,
                                             model.labels - min(vocab.labels))
@@ -61,14 +64,17 @@ def generate_sentences(model, vocab, beam_size):
                                stop_token=vocab.eos_index, max_len=cfg.max_gen_length,
                                min_op=min_op, length_penalty=cfg.length_penalty)
 
+    if cfg.decoder_inputs:
+        loop_function = lambda prev_symbol, i: tf.nn.embedding_lookup(model.embedding,
+                                                                      prev_symbol)
+    else:
+        loop_function = lambda prev_symbol, i: tf.zeros([tf.shape(prev_symbol)[0], 1])
     _, final_state = tf.nn.seq2seq.rnn_decoder(
                          [beam_decoder.wrap_input(initial_input)] +
                          [None] * (cfg.max_gen_length - 1),
                          beam_decoder.wrap_state(initial_state),
                          beam_decoder.wrap_cell(cell),
-                         loop_function=lambda prev_symbol, i: tf.nn.embedding_lookup(
-                             model.embedding,
-                             prev_symbol),
+                         loop_function=loop_function,
                          scope='Decoder/RNN'
                      )
     return beam_decoder.unwrap_output_dense(final_state)
