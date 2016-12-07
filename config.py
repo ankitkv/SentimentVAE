@@ -16,8 +16,9 @@ flags.DEFINE_string ("keep_fraction",   0.97,    "Percentage of vocab to keep.")
 
 
 flags.DEFINE_integer("batch_size",      64,      "Batch size")
-flags.DEFINE_bool   ("group_length",    True,    "Whether to group similar length sentences.")
-flags.DEFINE_integer("word_emb_size",   253,     "Number of learnable dimensions in "
+flags.DEFINE_bool   ("group_length",    True,    "Whether to group similar length "
+                                                 "sentences")
+flags.DEFINE_integer("word_emb_size",   224,     "Number of learnable dimensions in "
                                                  "word embeddings")
 flags.DEFINE_integer("label_emb_size",  3,       "Number of learnable dimensions in "
                                                  "label embeddings")
@@ -25,9 +26,10 @@ flags.DEFINE_bool   ("use_labels",      False,   "Use labels to condition on")
 flags.DEFINE_bool   ("variational",     True,    "Use variational objective")
 flags.DEFINE_bool   ("mutual_info",     True,    "Use mutual information objective")
 flags.DEFINE_bool   ("decoder_inputs",  False,   "Give true data as input to decoder")
+flags.DEFINE_bool   ("encoder_birnn",   True,    "Encoder is bidirectional")
 flags.DEFINE_string ("encoder_summary", 'attention', "How to use encoder states "
                                                      "(laststate, mean, attention)")
-flags.DEFINE_integer("num_layers",      2,       "Number of RNN layers")
+flags.DEFINE_integer("num_layers",      1,       "Number of RNN layers")
 flags.DEFINE_integer("max_gen_length",  50,      "Maximum length of generated sentences")
 flags.DEFINE_integer("beam_size",       16,      "Beam size for beam search")
 flags.DEFINE_integer("hidden_size",     512,     "RNN hidden state size")
@@ -40,12 +42,12 @@ flags.DEFINE_float  ("word_dropout",    0.2,     "Final word dropout probability
                                                  "decoder input")
 flags.DEFINE_float  ("decoding_noise",  0.1,     "StdDev of added noise to states during "
                                                  "beam search decoding (-1 to disable)")
-flags.DEFINE_float  ("length_penalty",  75.0,    "Bias beamsearch logprobs by "
+flags.DEFINE_float  ("length_penalty",  100.0,   "Bias beamsearch logprobs by "
                                                  "lp * log(curlen / targetlen)")
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
-flags.DEFINE_integer("anneal_bias",     8000,    "The step to reach ~1.0 for KL "
+flags.DEFINE_integer("anneal_bias",     7000,    "The step to reach ~1.0 for KL "
                                                  "divergence weight annealing")
 flags.DEFINE_float  ("anneal_max",      1.0,     "The maximum KL divergence weight")
 flags.DEFINE_float  ("mutinfo_weight",  1.0,     "The weight for the mutual info cost")
