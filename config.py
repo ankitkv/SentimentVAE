@@ -7,13 +7,11 @@ cfg = flags.FLAGS
 
 
 # command-line config
-flags.DEFINE_string ("data_path",  "data/yelp/",              "Data path")
-flags.DEFINE_string ("save_file",  "models/recent.dat", "Save file")
-flags.DEFINE_string ("load_file",  "",                  "File to load model "
-                                                        "from")
-flags.DEFINE_string ("vocab_file", "data/yelp/vocab.pk",     "Vocab pickle file")
-flags.DEFINE_string ("keep_fraction",   0.97,    "Percentage of vocab to keep.")
-
+flags.DEFINE_string ("data_path",  "data/yelp",          "Data path")
+flags.DEFINE_string ("save_file",  "models/recent.dat",  "Save file")
+flags.DEFINE_string ("load_file",  "",                   "File to load model from")
+flags.DEFINE_string ("vocab_file", "vocab",              "Vocab pickle file")
+flags.DEFINE_float  ("keep_fraction",   0.97,            "Percentage of vocab to keep")
 
 flags.DEFINE_integer("batch_size",      64,      "Batch size")
 flags.DEFINE_bool   ("group_length",    True,    "Whether to group similar length "
