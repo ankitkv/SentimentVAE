@@ -7,6 +7,7 @@ import numpy as np
 STAT_REGEX = re.compile(r'\d+:')
 EVERY = 50
 what = 'perplexity'
+AVG = 1
 
 with open(sys.argv[1]) as f:
     stats = {}
@@ -30,7 +31,11 @@ with open(sys.argv[1]) as f:
 
 l = len(stats[what])
 steps = np.zeros(l, dtype=np.int)
+kernel = np.ones(AVG)/AVG
 steps += EVERY
 steps = np.cumsum(steps)
-plt.plot(steps, stats['perplexity'])
+
+stat = stats['perplexity']
+stat = np.convolve(stat, kernel, 'same')
+plt.plot(steps, stat)
 plt.show()
