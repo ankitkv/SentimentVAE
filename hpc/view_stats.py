@@ -1,12 +1,16 @@
 import re
 import sys
 from matplotlib import pyplot as plt
+import numpy as np
 
 
 STAT_REGEX = re.compile(r'\d+:')
+EVERY = 50
+what = 'perplexity'
 
 with open(sys.argv[1]) as f:
     stats = {}
+    stats['steps'] = []
     for line in f.readlines():
         if STAT_REGEX.match(line):
             words = line.split()
@@ -23,7 +27,10 @@ with open(sys.argv[1]) as f:
                 stat_list.append(value)
                 stats[key] = stat_list
                 i += 2
-print(stats.keys())
-plt.plot(stats['perplexity'])
-plt.show()
 
+l = len(stats[what])
+steps = np.zeros(l, dtype=np.int)
+steps += EVERY
+steps = np.cumsum(steps)
+plt.plot(steps, stats['perplexity'])
+plt.show()
