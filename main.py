@@ -159,7 +159,7 @@ def main(_):
     reader = Reader(vocab)
 
     config_proto = tf.ConfigProto()
-    config_proto.gpu_options.allow_growth = True
+    # config_proto.gpu_options.allow_growth = True
     with tf.Graph().as_default(), tf.Session(config=config_proto) as session:
         with tf.variable_scope("Model") as scope:
             if cfg.training:
