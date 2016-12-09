@@ -22,7 +22,6 @@ def read_all_csv_rows(name, vocab):
         with filename.open('r') as f:
             for row in csv.reader(f):
                 line = vocab.lookup(row[1].split())
-                line = line[:cfg.max_length]
                 label = int(row[0])
                 rows.append((line, label))
         with pkfile.open('wb') as f:
@@ -39,8 +38,9 @@ def pack(batch):
     sent_lengths = np.zeros([cfg.batch_size], dtype=np.int32)
     labels = np.zeros([cfg.batch_size], dtype=np.int32)
     for i, s in enumerate(batch):
-        leftalign_batch[i, :len(s[0])] = s[0]
-        sent_lengths[i] = len(s[0])
+        trimmed_s = s[0][:cfg.max_length]
+        leftalign_batch[i, :len(trimmed_s)] = trimmed_s
+        sent_lengths[i] = len(trimmed_s)
         labels[i] = s[1]
     return leftalign_batch, sent_lengths, labels
 
