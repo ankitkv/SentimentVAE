@@ -16,6 +16,8 @@ flags.DEFINE_float  ("keep_fraction",   0.97,            "Percentage of vocab to
 flags.DEFINE_integer("batch_size",      64,      "Batch size")
 flags.DEFINE_bool   ("group_length",    True,    "Whether to group similar length "
                                                  "sentences")
+flags.DEFINE_integer("max_length",      None,    "The maximum length of sentences in "
+                                                 "the dataset")
 flags.DEFINE_integer("word_emb_size",   224,     "Number of learnable dimensions in "
                                                  "word embeddings")
 flags.DEFINE_integer("label_emb_size",  3,       "Number of learnable dimensions in "

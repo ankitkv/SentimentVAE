@@ -22,6 +22,7 @@ def read_all_csv_rows(name, vocab):
         with filename.open('r') as f:
             for row in csv.reader(f):
                 line = vocab.lookup(row[1].split())
+                line = line[:cfg.max_length]
                 label = int(row[0])
                 rows.append((line, label))
         with pkfile.open('wb') as f:
