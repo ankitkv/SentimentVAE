@@ -265,7 +265,8 @@ class EncoderDecoderModel(object):
     def mutinfo_loss(self, z, z_mean, z_logvar):
         '''Mutual information loss. We want to maximize the likelihood of z in the
            Gaussian represented by z_mean, z_logvar.'''
-        z = tf.stop_gradient(z)  # don't BP to z
+        if not cfg.mi_z_gradient:
+            z = tf.stop_gradient(z)
         z_var = tf.exp(z_logvar)
         z_sq = tf.square(z)
         z_epsilon = tf.square(z - z_mean)
