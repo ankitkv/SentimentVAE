@@ -25,7 +25,6 @@ flags.DEFINE_integer("label_emb_size",  3,       "Number of learnable dimensions
 flags.DEFINE_bool   ("use_labels",      False,   "Use labels to condition on")
 flags.DEFINE_bool   ("variational",     True,    "Use variational objective")
 flags.DEFINE_bool   ("mutual_info",     True,    "Use mutual information objective")
-flags.DEFINE_bool   ("mi_z_gradient",   False,   "Backprop to z from the MI objective")
 flags.DEFINE_bool   ("decoder_inputs",  False,   "Give true data as input to decoder")
 flags.DEFINE_bool   ("encoder_birnn",   True,    "Encoder is bidirectional")
 flags.DEFINE_string ("encoder_summary", 'attention', "How to use encoder states "
