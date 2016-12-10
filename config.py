@@ -27,13 +27,16 @@ flags.DEFINE_bool   ("variational",     True,    "Use variational objective")
 flags.DEFINE_bool   ("mutual_info",     True,    "Use mutual information objective")
 flags.DEFINE_bool   ("decoder_inputs",  False,   "Give true data as input to decoder")
 flags.DEFINE_bool   ("encoder_birnn",   True,    "Encoder is bidirectional")
+flags.DEFINE_bool   ("convolutional",   True,    "Use convolutional encoder instead of "
+                                                 "RNN")
+flags.DEFINE_string ("conv_width",      '5,5,3', "Convolutional kernel widths per layer")
 flags.DEFINE_string ("encoder_summary", 'attention', "How to use encoder states "
                                                      "(laststate, mean, attention)")
 flags.DEFINE_integer("num_layers",      1,       "Number of RNN layers")
 flags.DEFINE_integer("max_gen_length",  50,      "Maximum length of generated sentences")
 flags.DEFINE_integer("beam_size",       16,      "Beam size for beam search")
 flags.DEFINE_integer("hidden_size",     512,     "RNN hidden state size")
-flags.DEFINE_integer("latent_size",     48,      "Latent representation size")
+flags.DEFINE_integer("latent_size",     64,      "Latent representation size")
 flags.DEFINE_integer("dropout_start",   4000,    "Start reducing dropout at this step")
 flags.DEFINE_integer("dropout_finish",  13000,   "Stop reducing dropout at this step")
 flags.DEFINE_float  ("init_dropout",    0.95,    "Initial word dropout probability for "

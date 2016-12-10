@@ -31,9 +31,9 @@ def read_all_csv_rows(name, vocab):
     return rows
 
 
-def pack(batch):
+def pack(batch, min_size):
     '''Pack python-list batches into numpy batches'''
-    max_size = max(len(s[0]) for s in batch)
+    max_size = max(max(len(s[0]) for s in batch), min_size)
     leftalign_batch = np.zeros([cfg.batch_size, max_size], dtype=np.int32)
     sent_lengths = np.zeros([cfg.batch_size], dtype=np.int32)
     labels = np.zeros([cfg.batch_size], dtype=np.int32)
@@ -49,7 +49,7 @@ def is_batch_valid(batch):
     return batch[-1] is not None
 
 
-def row_batch_iter(rows):
+def row_batch_iter(rows, min_size):
     if cfg.group_length:
         rows.sort(key=lambda row: len(row[0]))
 
@@ -57,7 +57,7 @@ def row_batch_iter(rows):
     random.shuffle(csv_batches)
     for batch in csv_batches:
         if is_batch_valid(batch):
-            yield pack(batch)
+            yield pack(batch, min_size)
 
 
 class Vocab(object):
@@ -145,6 +145,10 @@ class Reader(object):
         self.vocab = vocab
         random.seed(0)  # deterministic random
         self.verbose = verbose
+        self.min_size = 0
+        if cfg.convolutional:
+            widths = [int(i) for i in cfg.conv_width.split(',')]
+            self.min_size += sum(widths) - len(widths) + 1
 
         if 'train' in load:
             if self.verbose:
@@ -169,15 +173,15 @@ class Reader(object):
 
     def training(self):
         '''Read batches from training data'''
-        return row_batch_iter(self.train_rows)
+        return row_batch_iter(self.train_rows, self.min_size)
 
     def validation(self):
         '''Read batches from validation data'''
-        return row_batch_iter(self.validation_rows)
+        return row_batch_iter(self.validation_rows, self.min_size)
 
     def testing(self):
         '''Read batches from testing data'''
-        return row_batch_iter(self.test_rows)
+        return row_batch_iter(self.test_rows, self.min_size)
 
 
 def main(_):

@@ -163,3 +163,16 @@ def highway(input_, layer_size=1, bias=-2, f=tf.nn.tanh, scope=None):
             input_ = output
 
     return output
+
+
+def conv1d(inputs, output_dims, kernel_width, stride=1, padding='SAME', scope=None):
+    '''Convolve one-dimensional data such as text.'''
+    with tf.variable_scope(scope or "Convolution"):
+        W_conv = tf.get_variable('W_conv', [kernel_width, inputs.get_shape()[-1].value,
+                                            output_dims],
+                                initializer=tf.contrib.layers.xavier_initializer_conv2d())
+        b_conv = tf.get_variable('b_conv', [output_dims],
+                                 initializer=tf.constant_initializer(0.0))
+        conv_out = tf.nn.conv1d(inputs, W_conv, stride, padding)
+        conv_out = tf.nn.bias_add(conv_out, b_conv)
+    return conv_out

@@ -161,50 +161,64 @@ class EncoderDecoderModel(object):
     def encoder(self, inputs, scope=None):
         '''Encode sentence and return a latent representation.'''
         with tf.variable_scope(scope or "Encoder"):
-            if cfg.encoder_birnn:
-                outputs, fs = tf.nn.bidirectional_dynamic_rnn(
-                                                self.rnn_cell(cfg.num_layers,
-                                                              cfg.hidden_size // 2),
-                                                self.rnn_cell(cfg.num_layers,
-                                                              cfg.hidden_size // 2),
-                                                inputs, sequence_length=self.lengths,
-                                                swap_memory=True, dtype=tf.float32)
-                outputs = tf.concat(2, outputs)
-                fs = tf.concat(1, fs[0] + fs[1])  # last states of fwd and bkwd
+            if cfg.convolutional:
+                out = inputs
+                widths = [int(i) for i in cfg.conv_width.split(',')]
+                for i, width in enumerate(widths[:-1]):
+                    out = utils.conv1d(out, cfg.hidden_size, width, 1, 'VALID',
+                                       scope='conv%d'%i)
+                    out = tf.nn.elu(out)
+                out = utils.conv1d(out, cfg.hidden_size, widths[-1], 1, 'VALID',
+                                   scope='conv_last')
+                z = tf.reduce_max(out, 1)
             else:
-                if cfg.encoder_summary == 'laststate':
-                    inputs = tf.reverse_sequence(inputs, self.lengths, 1)
-                outputs, fs = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
-                                                sequence_length=self.lengths,
-                                                swap_memory=True, dtype=tf.float32)
-                fs = tf.concat(1, fs)
-            if cfg.encoder_summary == 'laststate':
-                fs = utils.highway(fs, f=tf.nn.elu, layer_size=2,
-                                   scope='encoder_output_highway')
-                z = tf.nn.elu(utils.linear(fs, cfg.latent_size, True,
-                                           scope='outputs_transform'))
-            else:
-                outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
-                outputs = utils.highway(outputs, f=tf.nn.elu,
-                                        scope='encoder_output_highway')
-                if cfg.encoder_summary == 'attention':
-                    flat_input = tf.reshape(inputs, [-1, inputs.get_shape()[2].value])
-                    weights = utils.linear(tf.concat(1, [flat_input, outputs]),
-                                           cfg.hidden_size, True,
-                                           scope='outputs_attention')
-                    outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.hidden_size])
-                    weights = tf.reshape(weights, [cfg.batch_size, -1, cfg.hidden_size])
-                    weights = tf.nn.softmax(weights, 1)
-                    z = tf.reduce_sum(outputs * weights, [1])
-                    z = tf.nn.elu(utils.linear(z, cfg.latent_size, True,
-                                               scope='outputs_transform'))
-                elif cfg.encoder_summary == 'mean':
-                    outputs = utils.linear(outputs, cfg.latent_size, True,
-                                           scope='outputs_transform')
-                    outputs = tf.reshape(outputs, [cfg.batch_size, -1, cfg.latent_size])
-                    z = tf.nn.elu(tf.reduce_mean(outputs, [1]))
+                if cfg.encoder_birnn:
+                    outputs, fs = tf.nn.bidirectional_dynamic_rnn(
+                                                    self.rnn_cell(cfg.num_layers,
+                                                                  cfg.hidden_size // 2),
+                                                    self.rnn_cell(cfg.num_layers,
+                                                                  cfg.hidden_size // 2),
+                                                    inputs, sequence_length=self.lengths,
+                                                    swap_memory=True, dtype=tf.float32)
+                    outputs = tf.concat(2, outputs)
+                    fs = tf.concat(1, fs[0] + fs[1])  # last states of fwd and bkwd
                 else:
-                    raise ValueError('Invalid encoder_summary configuration.')
+                    if cfg.encoder_summary == 'laststate':
+                        inputs = tf.reverse_sequence(inputs, self.lengths, 1)
+                    outputs, fs = tf.nn.dynamic_rnn(self.rnn_cell(cfg.num_layers), inputs,
+                                                    sequence_length=self.lengths,
+                                                    swap_memory=True, dtype=tf.float32)
+                    fs = tf.concat(1, fs)
+                if cfg.encoder_summary == 'laststate':
+                    fs = utils.highway(fs, f=tf.nn.elu, layer_size=2,
+                                       scope='encoder_output_highway')
+                    z = tf.nn.elu(utils.linear(fs, cfg.latent_size, True,
+                                               scope='outputs_transform'))
+                else:
+                    outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
+                    outputs = utils.highway(outputs, f=tf.nn.elu,
+                                            scope='encoder_output_highway')
+                    if cfg.encoder_summary == 'attention':
+                        flat_input = tf.reshape(inputs, [-1, inputs.get_shape()[2].value])
+                        weights = utils.linear(tf.concat(1, [flat_input, outputs]),
+                                               cfg.hidden_size, True,
+                                               scope='outputs_attention')
+                        outputs = tf.reshape(outputs,
+                                             [cfg.batch_size, -1, cfg.hidden_size])
+                        weights = tf.reshape(weights,
+                                             [cfg.batch_size, -1, cfg.hidden_size])
+                        weights = tf.nn.softmax(weights, 1)
+                        z = tf.reduce_sum(outputs * weights, [1])
+                        z = tf.nn.elu(utils.linear(z, cfg.latent_size, True,
+                                                   scope='outputs_transform'))
+                    elif cfg.encoder_summary == 'mean':
+                        outputs = utils.linear(outputs, cfg.latent_size, True,
+                                               scope='outputs_transform')
+                        outputs = tf.reshape(outputs,
+                                             [cfg.batch_size, -1, cfg.latent_size])
+                        z = tf.nn.elu(tf.reduce_mean(outputs, [1]))
+                    else:
+                        raise ValueError('Invalid encoder_summary configuration.')
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
             z_logvar = utils.linear(z, cfg.latent_size, True, scope='encoder_z_logvar')
         return z_mean, z_logvar
