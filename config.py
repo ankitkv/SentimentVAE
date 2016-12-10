@@ -32,7 +32,7 @@ flags.DEFINE_bool   ("convolutional",   True,    "Use convolutional encoder inst
 flags.DEFINE_string ("conv_width",      '5,5,3', "Convolutional kernel widths per layer")
 flags.DEFINE_string ("encoder_summary", 'attention', "How to use encoder states "
                                                      "(laststate, mean, attention)")
-flags.DEFINE_integer("num_layers",      1,       "Number of RNN layers")
+flags.DEFINE_integer("num_layers",      2,       "Number of RNN layers")
 flags.DEFINE_integer("max_gen_length",  50,      "Maximum length of generated sentences")
 flags.DEFINE_integer("beam_size",       16,      "Beam size for beam search")
 flags.DEFINE_integer("hidden_size",     512,     "RNN hidden state size")
