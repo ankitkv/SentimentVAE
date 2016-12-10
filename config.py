@@ -50,10 +50,10 @@ flags.DEFINE_float  ("length_penalty",  100.0,   "Bias beamsearch logprobs by "
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
-flags.DEFINE_integer("anneal_bias",     7000,    "The step to reach ~1.0 for KL "
+flags.DEFINE_integer("anneal_bias",     5000,    "The step to reach ~1.0 for KL "
                                                  "divergence weight annealing")
 flags.DEFINE_float  ("anneal_max",      1.0,     "The maximum KL divergence weight")
-flags.DEFINE_float  ("mutinfo_weight",  1.0,     "The weight for the mutual info cost")
+flags.DEFINE_float  ("mutinfo_weight",  0.5,     "The weight for the mutual info cost")
 flags.DEFINE_bool   ("training",        True,    "Training mode, turn off for testing")
 flags.DEFINE_string ("optimizer",       "adam",  "Optimizer to use (sgd, adam, adagrad, "
                                                  "adadelta)")

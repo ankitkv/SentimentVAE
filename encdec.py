@@ -105,7 +105,7 @@ class EncoderDecoderModel(object):
                 self.kld = tf.reduce_sum(self.kld_loss(self.z_mean, z_logvar)) / \
                            cfg.batch_size
             self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(self.kld)))
-            self.kld_weight = cfg.anneal_max * tf.sigmoid((12 / cfg.anneal_bias)
+            self.kld_weight = cfg.anneal_max * tf.sigmoid((10 / cfg.anneal_bias)
                                              * (self.global_step - (cfg.anneal_bias / 2)))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
         with tf.name_scope('mutinfo-cost'):
@@ -120,7 +120,7 @@ class EncoderDecoderModel(object):
 
         with tf.name_scope('cost'):
             self.cost = self.nll + (self.kld_weight * self.kld) + \
-                        (cfg.mutinfo_weight * self.mutinfo)
+                        (self.kld_weight * cfg.mutinfo_weight * self.mutinfo)
 
         if training and not generator:
             self.train_op = self.train(self.cost)
@@ -164,12 +164,14 @@ class EncoderDecoderModel(object):
             if cfg.convolutional:
                 out = inputs
                 widths = [int(i) for i in cfg.conv_width.split(',')]
-                for i, width in enumerate(widths[:-1]):
+                for i, width in enumerate(widths):
                     out = utils.conv1d(out, cfg.hidden_size, width, 1, 'VALID',
                                        scope='conv%d'%i)
-                    out = tf.nn.elu(out)
-                out = utils.conv1d(out, cfg.hidden_size, widths[-1], 1, 'VALID',
-                                   scope='conv_last')
+                    out = tf.contrib.layers.batch_norm(inputs=out,
+                                                       is_training=self.training,
+                                                       scope='bn%d'%i)
+                    if i < len(widths) - 1:
+                        out = tf.nn.elu(out)
                 z = tf.reduce_max(out, 1)
             else:
                 if cfg.encoder_birnn:
