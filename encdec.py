@@ -40,46 +40,51 @@ class EncoderDecoderModel(object):
                 embs_labels = tf.expand_dims(embs_labels, 1)
                 self.embs_labels = tf.tile(embs_labels, [1, tf.shape(embs)[1], 1])
 
-        if generator:
-            self.z = tf.placeholder(tf.float32, [cfg.batch_size, cfg.latent_size])
-        else:
-            with tf.name_scope('concat_words_and_labels'):
-                if cfg.use_labels:
-                    embs_words_with_labels = tf.concat(2, [embs, self.embs_labels])
-                else:
-                    embs_words_with_labels = embs
-
-            self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
-
-            if cfg.variational:
-                with tf.name_scope('reparameterize'):
-                    eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
-                    self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
+        if cfg.autoencoder:
+            if generator:
+                self.z = tf.placeholder(tf.float32, [cfg.batch_size, cfg.latent_size])
             else:
-                self.z = self.z_mean
+                with tf.name_scope('concat_words_and_labels'):
+                    if cfg.use_labels:
+                        embs_words_with_labels = tf.concat(2, [embs, self.embs_labels])
+                    else:
+                        embs_words_with_labels = embs
 
-        with tf.name_scope('transform-z'):
-            z = utils.highway(self.z, layer_size=2, f=tf.nn.elu, scope='transform_z_hw')
-            self.z_transformed = utils.linear(z, cfg.latent_size, True,
-                                              scope='transform_z_lin')
+                self.z_mean, z_logvar = self.encoder(embs_words_with_labels)
+
+                if cfg.variational:
+                    with tf.name_scope('reparameterize'):
+                        eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
+                        self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
+                else:
+                    self.z = self.z_mean
+
+            with tf.name_scope('transform-z'):
+                z = utils.highway(self.z, layer_size=2, f=tf.nn.elu,
+                                  scope='transform_z_hw')
+                self.z_transformed = utils.linear(z, cfg.latent_size, True,
+                                                  scope='transform_z_lin')
+        else:
+            z = tf.zeros([cfg.batch_size, 1])
 
         with tf.name_scope('concat_words-labels-z'):
             # Concatenate dropped word embeddings, label embeddingd and 'z'
-            zt = tf.expand_dims(self.z_transformed, 1)
-            zt = tf.tile(zt, [1, tf.shape(embs_dropped)[1], 1])
             concat_list = []
             if cfg.decoder_inputs:
                 concat_list.append(embs_dropped)
             else:
                 concat_list.append(tf.zeros([cfg.batch_size, tf.shape(embs_dropped)[1],
                                              1]))
-            concat_list.append(zt)
+            if cfg.autoencoder:
+                zt = tf.expand_dims(self.z_transformed, 1)
+                zt = tf.tile(zt, [1, tf.shape(embs_dropped)[1], 1])
+                concat_list.append(zt)
             if cfg.use_labels:
                 concat_list.append(self.embs_labels)
             decode_embs = tf.concat(2, concat_list)
 
         output = self.decoder(decode_embs, z)
-        if cfg.mutual_info:
+        if cfg.autoencoder and cfg.mutual_info:
             mask = tf.expand_dims(tf.cast(tf.greater(self.data, 0), tf.float32), -1)
             if cfg.use_labels:
                 pencoder_embs = tf.concat(2, [mask, self.embs_labels])
@@ -99,7 +104,7 @@ class EncoderDecoderModel(object):
             self.summaries.append(tf.scalar_summary('perplexity', self.perplexity))
             self.summaries.append(tf.scalar_summary('cost_mle', self.nll))
         with tf.name_scope('kld-cost'):
-            if not cfg.variational or generator:
+            if not cfg.autoencoder or not cfg.variational or generator:
                 self.kld = tf.zeros([])
             else:
                 self.kld = tf.reduce_sum(self.kld_loss(self.z_mean, z_logvar)) / \
@@ -109,7 +114,7 @@ class EncoderDecoderModel(object):
                                              * (self.global_step - (cfg.anneal_bias / 2)))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
         with tf.name_scope('mutinfo-cost'):
-            if not cfg.mutual_info:
+            if not cfg.autoencoder or not cfg.mutual_info:
                 self.mutinfo = tf.zeros([])
             else:
                 self.mutinfo = tf.reduce_sum(self.mutinfo_loss(self.z,

@@ -110,7 +110,8 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         batch = batch + (dropped,)
 
         print_now = cfg.print_every != 0 and step % cfg.print_every == 0 and step > 0
-        display_now = cfg.display_every != 0 and step % cfg.display_every == 0
+        display_now = cfg.autoencoder and cfg.display_every != 0 and \
+                      step % cfg.display_every == 0
         summarize_now = print_now and summary_writer is not None and step > 0
         ret = call_mle_session(session, model, batch, summarize=summarize_now,
                                get_z=display_now)
@@ -174,7 +175,10 @@ def main(_):
             with tf.name_scope('generator'):
                 generator = EncoderDecoderModel(vocab, False, True)
             with tf.name_scope('beam_search'):
-                generate_op = generate_sentences(generator, vocab, cfg.beam_size)
+                if cfg.autoencoder:
+                    generate_op = generate_sentences(generator, vocab, cfg.beam_size)
+                else:
+                    generate_op = tf.no_op()
         saver = tf.train.Saver()
         summary_writer = tf.train.SummaryWriter('./summary', session.graph)
         try:
