@@ -221,6 +221,9 @@ def main(_):
                 if steps >= cfg.max_steps:
                     break
         else:
+            # TODO for the results of the variational model to be comparable to the
+            #      RNN baseline, we need to consider the same data point N times so that
+            #      we get an estimate of p(x) = E_{p(z)}[p(x|z)] with N samples.
             print('\nTesting')
             perplexity, kld, _ = run_epoch(0, session, test_model, generator,
                                            reader.testing(), vocab, None, 0,
