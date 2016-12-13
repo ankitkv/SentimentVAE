@@ -124,8 +124,8 @@ class EncoderDecoderModel(object):
                                                     tf.reduce_mean(self.mutinfo)))
 
         with tf.name_scope('cost'):
-            self.cost = self.nll + (self.kld_weight * self.kld) + \
-                        (self.kld_weight * cfg.mutinfo_weight * self.mutinfo)
+            self.cost = self.nll + (self.kld_weight * (self.kld + (cfg.mutinfo_weight * \
+                                                                   self.mutinfo)))
 
         if training and not generator:
             self.train_op = self.train(self.cost)
@@ -287,7 +287,7 @@ class EncoderDecoderModel(object):
         '''Mutual information loss. We want to maximize the likelihood of z in the
            Gaussian represented by z_mean, z_logvar.'''
         z = tf.stop_gradient(z)
-        z_var = tf.exp(z_logvar)
+        z_var = tf.exp(z_logvar) + 1e-8
         z_sq = tf.square(z)
         z_epsilon = tf.square(z - z_mean)
         return 0.5 * tf.reduce_sum(z_logvar + (z_epsilon / z_var) - z_sq, 1)
