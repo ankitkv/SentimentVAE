@@ -179,7 +179,7 @@ def main(_):
                     generate_op = generate_sentences(generator, vocab, cfg.beam_size)
                 else:
                     generate_op = tf.no_op()
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(max_to_keep=None)
         summary_writer = tf.train.SummaryWriter('./summary', session.graph)
         try:
             # try to restore a saved model file
