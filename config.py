@@ -53,7 +53,8 @@ flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample fo
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
 flags.DEFINE_integer("anneal_bias",     6500,    "The step to reach ~1.0 for KL "
                                                  "divergence weight annealing. Set to 0 to"
-                                                 "disable annealing")
+                                                 "disable annealing and set KLD weight to"
+                                                 "anneal_max from the start.")
 flags.DEFINE_float  ("anneal_max",      1.0,     "The maximum KL divergence weight")
 flags.DEFINE_float  ("mutinfo_weight",  1.0,     "The weight for the mutual info cost")
 flags.DEFINE_bool   ("training",        True,    "Training mode, turn off for testing")

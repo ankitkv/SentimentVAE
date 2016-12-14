@@ -111,7 +111,7 @@ class EncoderDecoderModel(object):
                            cfg.batch_size
             self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(self.kld)))
             if np.isclose(cfg.anneal_bias, 0):
-                self.kld_weight = 1.0
+                self.kld_weight = tf.constant(cfg.anneal_max)
             else:
                 self.kld_weight = cfg.anneal_max * tf.sigmoid((10 / cfg.anneal_bias)
                                                  * (self.global_step - (cfg.anneal_bias / 2)))
