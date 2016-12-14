@@ -110,8 +110,11 @@ class EncoderDecoderModel(object):
                 self.kld = tf.reduce_sum(self.kld_loss(self.z_mean, z_logvar)) / \
                            cfg.batch_size
             self.summaries.append(tf.scalar_summary('cost_kld', tf.reduce_mean(self.kld)))
-            self.kld_weight = cfg.anneal_max * tf.sigmoid((10 / cfg.anneal_bias)
-                                             * (self.global_step - (cfg.anneal_bias / 2)))
+            if np.isclose(cfg.anneal_bias, 0):
+                self.kld_weight = 1.0
+            else:
+                self.kld_weight = cfg.anneal_max * tf.sigmoid((10 / cfg.anneal_bias)
+                                                 * (self.global_step - (cfg.anneal_bias / 2)))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
         with tf.name_scope('mutinfo-cost'):
             if not cfg.autoencoder or not cfg.mutual_info:
