@@ -54,7 +54,7 @@ class EncoderDecoderModel(object):
 
                 if cfg.variational:
                     with tf.name_scope('reparameterize'):
-                        eps = tf.random_normal([cfg.batch_size, cfg.latent_size])
+                        eps = tf.truncated_normal([cfg.batch_size, cfg.latent_size])
                         self.z = self.z_mean + tf.mul(tf.sqrt(tf.exp(z_logvar)), eps)
                 else:
                     self.z = self.z_mean
@@ -114,7 +114,7 @@ class EncoderDecoderModel(object):
                 self.kld_weight = tf.constant(cfg.anneal_max)
             else:
                 self.kld_weight = cfg.anneal_max * tf.sigmoid((10 / cfg.anneal_bias)
-                                                 * (self.global_step - (cfg.anneal_bias / 2)))
+                                             * (self.global_step - (cfg.anneal_bias / 2)))
             self.summaries.append(tf.scalar_summary('weight_kld', self.kld_weight))
         with tf.name_scope('mutinfo-cost'):
             if not cfg.autoencoder or not cfg.mutual_info:
@@ -282,7 +282,23 @@ class EncoderDecoderModel(object):
     def kld_loss(self, z_mean, z_logvar):
         '''KL divergence loss.'''
         z_var = tf.exp(z_logvar)
+        if cfg.debug:
+            z_var = tf.Print(z_var, [tf.reduce_min(z_var), tf.reduce_max(z_var)],
+                             'kl_z_var (min, max)')
+            z_var = tf.Print(z_var, [tf.reduce_min(z_mean), tf.reduce_max(z_mean)],
+                             'kl_z_mean (min, max)')
+            z_var = tf.Print(z_var, [tf.reduce_min(z_logvar), tf.reduce_max(z_logvar)],
+                             'kl_z_logvar (min, max)')
+
+            z_var = tf.verify_tensor_all_finite(z_var, 'kl z_var exploded')
+            z_mean = tf.verify_tensor_all_finite(z_mean, 'kl z_mean exploded')
+            z_logvar = tf.verify_tensor_all_finite(z_logvar, 'kl z_logvar exploded')
+
         z_mean_sq = tf.square(z_mean)
+
+        if cfg.debug:
+            z_mean_sq = tf.verify_tensor_all_finite(z_mean_sq, 'kl z_mean_sq exploded')
+
         kld_loss = 0.5 * tf.reduce_sum(z_var + z_mean_sq - 1 - z_logvar, 1)
         return kld_loss
 
@@ -291,8 +307,27 @@ class EncoderDecoderModel(object):
            Gaussian represented by z_mean, z_logvar.'''
         z = tf.stop_gradient(z)
         z_var = tf.exp(z_logvar) + 1e-8
+        if cfg.debug:
+            z_var = tf.Print(z_var, [tf.reduce_min(z_var), tf.reduce_max(z_var)],
+                             'mi_z_var (min, max)')
+            z_var = tf.Print(z_var, [tf.reduce_min(z), tf.reduce_max(z)],
+                             'mi_z (min, max)')
+            z_var = tf.Print(z_var, [tf.reduce_min(z_mean), tf.reduce_max(z_mean)],
+                             'mi_z_mean (min, max)')
+            z_var = tf.Print(z_var, [tf.reduce_min(z_logvar), tf.reduce_max(z_logvar)],
+                             'mi_z_logvar (min, max)')
+
+            z = tf.verify_tensor_all_finite(z, 'mi z exploded')
+            z_var = tf.verify_tensor_all_finite(z_var, 'mi z_var exploded')
+            z_mean = tf.verify_tensor_all_finite(z_mean, 'mi z_mean exploded')
+            z_logvar = tf.verify_tensor_all_finite(z_logvar, 'mi z_logvar exploded')
+
+
         z_sq = tf.square(z)
         z_epsilon = tf.square(z - z_mean)
+        if cfg.debug:
+            z_sq = tf.verify_tensor_all_finite(z_sq, 'mi z_sq exploded')
+            z_epsilon = tf.verify_tensor_all_finite(z_epsilon, 'mi z_epsilon exploded')
         return 0.5 * tf.reduce_sum(z_logvar + (z_epsilon / z_var) - z_sq, 1)
 
     def train(self, cost):
@@ -302,13 +337,17 @@ class EncoderDecoderModel(object):
         optimizer = utils.get_optimizer(self.lr, cfg.optimizer)
         tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         grads = tf.gradients(cost, tvars)
-        #tmp = []
-        #for g, v in zip(grads, tvars):
-        #    tmp.append(tf.Print(tf.reduce_sum(g), [tf.sqrt(tf.reduce_sum(tf.square(g)))],
-        #                        v.op.name, summarize=10))
-        #a = tf.reduce_mean(tf.pack(tmp)) * 0.0
+        if cfg.debug:
+            tmp = []
+            for g, v in zip(grads, tvars):
+                g = tf.verify_tensor_all_finite(g, 'gradient for %s exploded' % v.op.name)
+                tmp.append(tf.Print(tf.reduce_sum(g), [tf.reduce_min(g), tf.reduce_max(g),
+                                                    tf.sqrt(tf.reduce_sum(tf.square(g)))],
+                                    'grad %s (min, max, norm)' % v.op.name, summarize=10))
+            a = tf.reduce_mean(tf.pack(tmp)) * 0.0
         if cfg.max_grad_norm > 0:
-        #    grads[0] += a
+            if cfg.debug:
+                grads[0] += a
             grads, _ = tf.clip_by_global_norm(grads, cfg.max_grad_norm)
         return optimizer.apply_gradients(list(zip(grads, tvars)),
                                          global_step=self.global_step)

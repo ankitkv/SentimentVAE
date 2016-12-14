@@ -134,6 +134,8 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
                    kld_weight, word_count * cfg.batch_size / (time.time() - start_time)))
             if summary_writer is not None:
                 summary_writer.add_summary(summary_str, gstep)
+        if cfg.debug:
+            print()
 
         if display_now:
             show_reconstructions(session, generator, generate_op, batch, vocab, z)
