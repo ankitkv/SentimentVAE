@@ -60,8 +60,7 @@ class EncoderDecoderModel(object):
                     self.z = self.z_mean
 
             with tf.name_scope('transform-z'):
-                z = utils.highway(self.z, layer_size=2, f=tf.nn.elu,
-                                  scope='transform_z_hw')
+                z = utils.highway(self.z, f=tf.nn.elu, bias=0, scope='transform_z_hw')
                 self.z_transformed = utils.linear(z, cfg.latent_size, True,
                                                   scope='transform_z_lin')
         else:
@@ -200,14 +199,12 @@ class EncoderDecoderModel(object):
                                                     swap_memory=True, dtype=tf.float32)
                     fs = tf.concat(1, fs)
                 if cfg.encoder_summary == 'laststate':
-                    fs = utils.highway(fs, f=tf.nn.elu, layer_size=2,
-                                       scope='encoder_output_highway')
-                    z = tf.nn.elu(utils.linear(fs, cfg.latent_size, True,
-                                               scope='outputs_transform'))
+                    fs = utils.highway(fs, scope='encoder_output_highway')
+                    z = tf.nn.tanh(utils.linear(fs, cfg.latent_size, True,
+                                                scope='outputs_transform'))
                 else:
                     outputs = tf.reshape(outputs, [-1, cfg.hidden_size])
-                    outputs = utils.highway(outputs, f=tf.nn.elu,
-                                            scope='encoder_output_highway')
+                    outputs = utils.highway(outputs, scope='encoder_output_highway')
                     if cfg.encoder_summary == 'attention':
                         flat_input = tf.reshape(inputs, [-1, inputs.get_shape()[2].value])
                         weights = utils.linear(tf.concat(1, [flat_input, outputs]),
@@ -219,14 +216,14 @@ class EncoderDecoderModel(object):
                                              [cfg.batch_size, -1, cfg.hidden_size])
                         weights = tf.nn.softmax(weights, 1)
                         z = tf.reduce_sum(outputs * weights, [1])
-                        z = tf.nn.elu(utils.linear(z, cfg.latent_size, True,
-                                                   scope='outputs_transform'))
+                        z = tf.nn.tanh(utils.linear(z, cfg.latent_size, True,
+                                                    scope='outputs_transform'))
                     elif cfg.encoder_summary == 'mean':
                         outputs = utils.linear(outputs, cfg.latent_size, True,
                                                scope='outputs_transform')
                         outputs = tf.reshape(outputs,
                                              [cfg.batch_size, -1, cfg.latent_size])
-                        z = tf.nn.elu(tf.reduce_mean(outputs, [1]))
+                        z = tf.nn.tanh(tf.reduce_mean(outputs, [1]))
                     else:
                         raise ValueError('Invalid encoder_summary configuration.')
             z_mean = utils.linear(z, cfg.latent_size, True, scope='encoder_z_mean')
