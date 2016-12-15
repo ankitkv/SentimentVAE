@@ -13,7 +13,7 @@ flags.DEFINE_string ("load_file",  "",                   "File to load model fro
 flags.DEFINE_string ("vocab_file", "vocab",              "Vocab pickle file")
 flags.DEFINE_float  ("keep_fraction",   0.97,            "Percentage of vocab to keep")
 
-flags.DEFINE_integer("batch_size",      64,      "Batch size")
+flags.DEFINE_integer("batch_size",      48,      "Batch size")
 flags.DEFINE_bool   ("group_length",    True,    "Whether to group similar length "
                                                  "sentences")
 flags.DEFINE_integer("max_length",      None,    "The maximum length of sentences in "
