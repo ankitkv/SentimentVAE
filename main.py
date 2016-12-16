@@ -211,8 +211,8 @@ def main(_):
                 train_losses.append((perplexity, kld))
                 if cfg.validate_every > 0 and (i + 1) % cfg.validate_every == 0:
                     perplexity, kld, _ = run_epoch(i, session, eval_model, generator,
-                                                   reader.validation(), vocab, None, 0,
-                                                   -1, generate_op, None)
+                                                   reader.validation(cfg.val_ll_samples),
+                                                   vocab, None, 0, -1, generate_op, None)
                     print("Epoch: %d Validation Perplexity: %.3f, KL Divergence: %.3f"
                           % (i + 1, perplexity, kld))
                     valid_losses.append((perplexity, kld))
@@ -228,8 +228,8 @@ def main(_):
             #      we get an estimate of p(x) = E_{p(z)}[p(x|z)] with N samples.
             print('\nTesting')
             perplexity, kld, _ = run_epoch(0, session, test_model, generator,
-                                           reader.testing(), vocab, None, 0,
-                                           cfg.max_steps, generate_op, None)
+                                           reader.testing(cfg.test_ll_samples), vocab,
+                                           None, 0, cfg.max_steps, generate_op, None)
             print("Test Perplexity: %.3f, KL Divergence: %.3f" % (perplexity, kld))
 
 
