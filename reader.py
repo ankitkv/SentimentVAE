@@ -49,15 +49,16 @@ def is_batch_valid(batch):
     return batch[-1] is not None
 
 
-def row_batch_iter(rows, min_size):
+def row_batch_iter(rows, min_size, n):
     if cfg.group_length:
         rows.sort(key=lambda row: len(row[0]))
 
     csv_batches = list(utils.grouper(cfg.batch_size, rows, None))
     random.shuffle(csv_batches)
-    for batch in csv_batches:
-        if is_batch_valid(batch):
-            yield pack(batch, min_size)
+    for i in range(n):
+        for batch in csv_batches:
+            if is_batch_valid(batch):
+                yield pack(batch, min_size)
 
 
 class Vocab(object):
@@ -171,17 +172,17 @@ class Reader(object):
             if self.verbose:
                 print('Testing samples = %d' % len(self.test_rows))
 
-    def training(self):
+    def training(self, n=1):
         '''Read batches from training data'''
-        return row_batch_iter(self.train_rows, self.min_size)
+        return row_batch_iter(self.train_rows, self.min_size, n)
 
-    def validation(self):
+    def validation(self, n=1):
         '''Read batches from validation data'''
-        return row_batch_iter(self.validation_rows, self.min_size)
+        return row_batch_iter(self.validation_rows, self.min_size, n)
 
-    def testing(self):
+    def testing(self, n=1):
         '''Read batches from testing data'''
-        return row_batch_iter(self.test_rows, self.min_size)
+        return row_batch_iter(self.test_rows, self.min_size, n)
 
 
 def main(_):
