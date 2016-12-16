@@ -74,6 +74,7 @@ flags.DEFINE_integer("display_every",   0,       "Print generated sentences ever
 flags.DEFINE_integer("save_every",      -1,      "Save every these many steps (0 to "
                                                  "disable, -1 for each epoch)")
 flags.DEFINE_bool   ("save_overwrite",  True,    "Overwrite the same file each time")
+flags.DEFINE_bool   ("test_validation", True,    "Use the validation set during testing")
 flags.DEFINE_integer("validate_every",  1,       "Validate every these many epochs (0 "
                                                  "to disable)")
 flags.DEFINE_bool   ("debug",           False,   "Debug mode")

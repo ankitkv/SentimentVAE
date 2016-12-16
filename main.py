@@ -1,3 +1,4 @@
+import glob
 import sys
 import time
 
@@ -100,12 +101,12 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
     klds = 0.0
     costs = 0.0
     iters = 0
-    global_step = session.run(model.global_step)
 
     for step, batch in enumerate(batch_loader):
+        cur_iters = steps + step
         drop_prob = utils.linear_interpolation(cfg.init_dropout, cfg.word_dropout,
                                                cfg.dropout_start, cfg.dropout_finish,
-                                               global_step + step)
+                                               cur_iters)
         dropped = utils.word_dropout(batch[0], batch[1], vocab, drop_prob)
         batch = batch + (dropped,)
 
@@ -128,10 +129,11 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         costs += cost
         iters += sentence_length
         if print_now:
-            print("%d: %d  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
+            print("%d: %d (%d)  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
                   "mutinfo_loss: %.4f  cost: %.4f  kld_weight: %.4f  speed: %.0f wps" %
-                  (epoch + 1, step, np.exp(nll/sentence_length), nll, kld, mutinfo, cost,
-                   kld_weight, word_count * cfg.batch_size / (time.time() - start_time)))
+                  (epoch + 1, step, cur_iters, np.exp(nll/sentence_length), nll, kld,
+                   mutinfo, cost, kld_weight,
+                   word_count * cfg.batch_size / (time.time() - start_time)))
             if summary_writer is not None:
                 summary_writer.add_summary(summary_str, gstep)
         if cfg.debug:
@@ -140,7 +142,6 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         if display_now:
             show_reconstructions(session, generator, generate_op, batch, vocab, z)
 
-        cur_iters = steps + step
         if saver is not None and cur_iters and cfg.save_every > 0 and \
                 cur_iters % cfg.save_every == 0:
             save_model(session, saver, np.exp(nlls / iters), np.exp(klds / (step + 1)),
@@ -163,74 +164,92 @@ def main(_):
 
     config_proto = tf.ConfigProto()
     # config_proto.gpu_options.allow_growth = True
-    with tf.Graph().as_default(), tf.Session(config=config_proto) as session:
-        with tf.variable_scope("Model") as scope:
-            if cfg.training:
-                with tf.name_scope('training'):
-                    model = EncoderDecoderModel(vocab, True)
-                    scope.reuse_variables()
-                with tf.name_scope('evaluation'):
-                    eval_model = EncoderDecoderModel(vocab, False)
-            else:
-                test_model = EncoderDecoderModel(vocab, False)
-                scope.reuse_variables()
-            with tf.name_scope('generator'):
-                generator = EncoderDecoderModel(vocab, False, True)
-            with tf.name_scope('beam_search'):
-                if cfg.autoencoder:
-                    generate_op = generate_sentences(generator, vocab, cfg.beam_size)
-                else:
-                    generate_op = tf.no_op()
-        saver = tf.train.Saver(max_to_keep=None)
-        summary_writer = tf.train.SummaryWriter('./summary', session.graph)
-        try:
-            # try to restore a saved model file
-            saver.restore(session, cfg.load_file)
-            print("Model restored from", cfg.load_file)
-        except ValueError:
-            if cfg.training:
-                tf.initialize_all_variables().run()
-                print("No loadable model file, new model initialized.")
-            else:
-                print("You need to provide a valid model file for testing!")
-                sys.exit(1)
 
-        if cfg.training:
-            steps = 0
-            train_losses = []
-            valid_losses = []
-            model.assign_lr(session, cfg.learning_rate)
-            for i in range(cfg.max_epoch):
-                print("\nEpoch: %d  Learning rate: %.5f" % (i + 1, session.run(model.lr)))
-                perplexity, kld, steps = run_epoch(i, session, model, generator,
-                                                   reader.training(), vocab, saver, steps,
-                                                   cfg.max_steps, generate_op,
-                                                   summary_writer)
-                print("Epoch: %d Train Perplexity: %.3f, KL Divergence: %.3f"
-                      % (i + 1, perplexity, kld))
-                train_losses.append((perplexity, kld))
-                if cfg.validate_every > 0 and (i + 1) % cfg.validate_every == 0:
-                    perplexity, kld, _ = run_epoch(i, session, eval_model, generator,
-                                                   reader.validation(cfg.val_ll_samples),
-                                                   vocab, None, 0, -1, generate_op, None)
-                    print("Epoch: %d Validation Perplexity: %.3f, KL Divergence: %.3f"
-                          % (i + 1, perplexity, kld))
-                    valid_losses.append((perplexity, kld))
+    if not cfg.training and not cfg.save_overwrite:
+        load_files = [f for f in glob.glob(cfg.load_file + '.*')
+                      if not f.endswith('meta')]
+        load_files = sorted(load_files, key=lambda x: int(x[len(cfg.load_file)+1:]))
+    else:
+        load_files = [cfg.load_file]
+    if not cfg.training:
+        test_losses = []
+    for load_file in load_files:
+        with tf.Graph().as_default(), tf.Session(config=config_proto) as session:
+            with tf.variable_scope("Model") as scope:
+                if cfg.training:
+                    with tf.name_scope('training'):
+                        model = EncoderDecoderModel(vocab, True)
+                        scope.reuse_variables()
+                    with tf.name_scope('evaluation'):
+                        eval_model = EncoderDecoderModel(vocab, False)
                 else:
-                    valid_losses.append(None)
-                print('Train:', train_losses)
-                print('Valid:', valid_losses)
-                if steps >= cfg.max_steps:
-                    break
-        else:
-            # TODO for the results of the variational model to be comparable to the
-            #      RNN baseline, we need to consider the same data point N times so that
-            #      we get an estimate of p(x) = E_{p(z)}[p(x|z)] with N samples.
-            print('\nTesting')
-            perplexity, kld, _ = run_epoch(0, session, test_model, generator,
-                                           reader.testing(cfg.test_ll_samples), vocab,
-                                           None, 0, cfg.max_steps, generate_op, None)
-            print("Test Perplexity: %.3f, KL Divergence: %.3f" % (perplexity, kld))
+                    test_model = EncoderDecoderModel(vocab, False)
+                    scope.reuse_variables()
+                with tf.name_scope('generator'):
+                    generator = EncoderDecoderModel(vocab, False, True)
+                with tf.name_scope('beam_search'):
+                    if cfg.autoencoder:
+                        generate_op = generate_sentences(generator, vocab, cfg.beam_size)
+                    else:
+                        generate_op = tf.no_op()
+            saver = tf.train.Saver(max_to_keep=None)
+            summary_writer = tf.train.SummaryWriter('./summary', session.graph)
+            steps = 0
+            try:
+                # try to restore a saved model file
+                saver.restore(session, load_file)
+                print("\nModel restored from", load_file)
+                with tf.variable_scope("Model", reuse=True):
+                    steps = int(session.run(tf.get_variable("global_step")))
+                print('Global step', steps)
+            except ValueError:
+                if cfg.training:
+                    tf.initialize_all_variables().run()
+                    print("No loadable model file, new model initialized.")
+                else:
+                    print("You need to provide a valid model file for testing!")
+                    sys.exit(1)
+            if cfg.training:
+                train_losses = []
+                valid_losses = []
+                model.assign_lr(session, cfg.learning_rate)
+                for i in range(cfg.max_epoch):
+                    print("\nEpoch: %d  Learning rate: %.5f" % (i + 1,
+                                                                session.run(model.lr)))
+                    perplexity, kld, steps = run_epoch(i, session, model, generator,
+                                                       reader.training(), vocab, saver,
+                                                       steps, cfg.max_steps, generate_op,
+                                                       summary_writer)
+                    print("Epoch: %d Train Perplexity: %.3f, KL Divergence: %.3f"
+                          % (i + 1, perplexity, kld))
+                    train_losses.append((perplexity, kld))
+                    if cfg.validate_every > 0 and (i + 1) % cfg.validate_every == 0:
+                        perplexity, kld, _ = run_epoch(i, session, eval_model, generator,
+                                                    reader.validation(cfg.val_ll_samples),
+                                                    vocab, None, 0, -1, generate_op, None)
+                        print("Epoch: %d Validation Perplexity: %.3f, KL Divergence: %.3f"
+                              % (i + 1, perplexity, kld))
+                        valid_losses.append((perplexity, kld))
+                    else:
+                        valid_losses.append(None)
+                    print('Train:', train_losses)
+                    print('Valid:', valid_losses)
+                    if steps >= cfg.max_steps:
+                        break
+            else:
+                if cfg.test_validation:
+                    batch_loader = reader.validation(cfg.test_ll_samples)
+                else:
+                    batch_loader = reader.testing(cfg.test_ll_samples)
+                print('\nTesting')
+                perplexity, kld, _ = run_epoch(steps, session, test_model, generator,
+                                               batch_loader, vocab, None, 0,
+                                               cfg.max_steps, generate_op, None)
+                print("Test Perplexity: %.3f, KL Divergence: %.3f" % (perplexity, kld))
+
+                test_losses.append((int(steps), (perplexity, kld)))
+                print('Test:', test_losses)
+                test_model = None
 
 
 if __name__ == "__main__":
