@@ -99,6 +99,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
     word_count = 0.0
     nlls = 0.0
     klds = 0.0
+    lls = 0.0
     costs = 0.0
     iters = 0
 
@@ -117,6 +118,7 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         ret = call_mle_session(session, model, batch, summarize=summarize_now,
                                get_z=display_now)
         nll, kld, mutinfo, cost = ret[:4]
+        ll = -nll - kld
         if summarize_now:
             summary_str, gstep = ret[4:6]
         if display_now:
@@ -126,13 +128,14 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
         kld_weight = session.run(model.kld_weight)
         nlls += nll
         klds += kld
+        lls += ll
         costs += cost
         iters += sentence_length
         if print_now:
             print("%d: %d (%d)  perplexity: %.3f  mle_loss: %.4f  kl_divergence: %.4f  "
-                  "mutinfo_loss: %.4f  cost: %.4f  kld_weight: %.4f  speed: %.0f wps" %
-                  (epoch + 1, step, cur_iters, np.exp(nll/sentence_length), nll, kld,
-                   mutinfo, cost, kld_weight,
+                  "mutinfo_loss: %.4f  ll: %.4f  cost: %.4f  kld_weight: %.4f  "
+                  "speed: %.0f wps" % (epoch + 1, step, cur_iters,
+                   np.exp(nll/sentence_length), nll, kld, mutinfo, ll, cost, kld_weight,
                    word_count * cfg.batch_size / (time.time() - start_time)))
             if summary_writer is not None:
                 summary_writer.add_summary(summary_str, gstep)
@@ -151,10 +154,11 @@ def run_epoch(epoch, session, model, generator, batch_loader, vocab, saver, step
 
     perp = np.exp(nlls / iters)
     kld = klds / step
+    ll = lls / step
     cur_iters = steps + step
     if saver is not None and cfg.save_every < 0:
         save_model(session, saver, perp, kld, cur_iters)
-    return perp, kld, cur_iters
+    return perp, kld, ll, cur_iters
 
 
 def main(_):
@@ -216,20 +220,22 @@ def main(_):
                 for i in range(cfg.max_epoch):
                     print("\nEpoch: %d  Learning rate: %.5f" % (i + 1,
                                                                 session.run(model.lr)))
-                    perplexity, kld, steps = run_epoch(i, session, model, generator,
-                                                       reader.training(), vocab, saver,
-                                                       steps, cfg.max_steps, generate_op,
-                                                       summary_writer)
-                    print("Epoch: %d Train Perplexity: %.3f, KL Divergence: %.3f"
-                          % (i + 1, perplexity, kld))
-                    train_losses.append((perplexity, kld))
+                    perplexity, kld, ll, steps = run_epoch(i, session, model, generator,
+                                                           reader.training(), vocab,
+                                                           saver, steps, cfg.max_steps,
+                                                           generate_op, summary_writer)
+                    print("Epoch: %d Train Perplexity: %.3f, KL Divergence: %.3f, "
+                          "LL: %.3f" % (i + 1, perplexity, kld, ll))
+                    train_losses.append((perplexity, kld, ll))
                     if cfg.validate_every > 0 and (i + 1) % cfg.validate_every == 0:
-                        perplexity, kld, _ = run_epoch(i, session, eval_model, generator,
+                        perplexity, kld, ll, _ = run_epoch(i, session,
+                                                    eval_model, generator,
                                                     reader.validation(cfg.val_ll_samples),
                                                     vocab, None, 0, -1, generate_op, None)
-                        print("Epoch: %d Validation Perplexity: %.3f, KL Divergence: %.3f"
-                              % (i + 1, perplexity, kld))
-                        valid_losses.append((perplexity, kld))
+                        print("Epoch: %d Validation Perplexity: %.3f, "
+                              "KL Divergence: %.3f, LL: %.3f" % (i + 1, perplexity, kld,
+                                                                 ll))
+                        valid_losses.append((perplexity, kld, ll))
                     else:
                         valid_losses.append(None)
                     print('Train:', train_losses)
@@ -242,12 +248,13 @@ def main(_):
                 else:
                     batch_loader = reader.testing(cfg.test_ll_samples)
                 print('\nTesting')
-                perplexity, kld, _ = run_epoch(steps, session, test_model, generator,
-                                               batch_loader, vocab, None, 0,
-                                               cfg.max_steps, generate_op, None)
-                print("Test Perplexity: %.3f, KL Divergence: %.3f" % (perplexity, kld))
+                perplexity, kld, ll, _ = run_epoch(steps, session, test_model, generator,
+                                                   batch_loader, vocab, None, 0,
+                                                   cfg.max_steps, generate_op, None)
+                print("Test Perplexity: %.3f, KL Divergence: %.3f, "
+                      "LL: %.3f" % (perplexity, kld, ll))
 
-                test_losses.append((int(steps), (perplexity, kld)))
+                test_losses.append((steps, (perplexity, kld, ll)))
                 print('Test:', test_losses)
                 test_model = None
 

@@ -50,9 +50,9 @@ flags.DEFINE_float  ("length_penalty",  100.0,   "Bias beamsearch logprobs by "
                                                  "lp * log(curlen / targetlen)")
 flags.DEFINE_integer("softmax_samples", 1000,    "Number of classes to sample for "
                                                  "softmax")
-flags.DEFINE_integer("val_ll_samples",  5,       "Number of samples to use to estimate "
+flags.DEFINE_integer("val_ll_samples",  3,       "Number of samples to use to estimate "
                                                  "log-likelihood of validation data")
-flags.DEFINE_integer("test_ll_samples", 50,      "Number of samples to use to estimate "
+flags.DEFINE_integer("test_ll_samples", 10,      "Number of samples to use to estimate "
                                                  "log-likelihood of test data")
 flags.DEFINE_float  ("max_grad_norm",   5.0,     "Gradient clipping")
 flags.DEFINE_integer("anneal_bias",     6500,    "The step to reach ~1.0 for KL "
