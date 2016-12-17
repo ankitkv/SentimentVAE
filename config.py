@@ -78,10 +78,10 @@ flags.DEFINE_bool   ("test_validation", True,    "Use the validation set during 
 flags.DEFINE_integer("validate_every",  1,       "Validate every these many epochs (0 "
                                                  "to disable)")
 flags.DEFINE_bool   ("debug",           False,   "Debug mode")
-flags.DEFINE_integer("gpu_id",          0,       "The GPU to use")
+flags.DEFINE_integer("gpu_id",          -1,      "The GPU to use (-1 for default)")
 
 
-if cfg.gpu_id != 0:
+if cfg.gpu_id != -1:
     os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.gpu_id)
 
 print('Config:')
