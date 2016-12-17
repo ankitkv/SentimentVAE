@@ -178,7 +178,7 @@ class Reader(object):
 
     def validation(self, n=1):
         '''Read batches from validation data'''
-        return row_batch_iter(self.validation_rows, self.min_size, n)
+        return row_batch_iter(self.validation_rows[:3000], self.min_size, n)
 
     def testing(self, n=1):
         '''Read batches from testing data'''
