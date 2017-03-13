@@ -304,6 +304,7 @@ class EncoderDecoderModel(object):
            Gaussian represented by z_mean, z_logvar.'''
         z = tf.stop_gradient(z)
         z_var = tf.exp(z_logvar) + 1e-8
+        z_logvar = tf.log(z_var)  # adjust for epsilon
         if cfg.debug:
             z_var = tf.Print(z_var, [tf.reduce_min(z_var), tf.reduce_max(z_var)],
                              'mi_z_var (min, max)')
